@@ -24,7 +24,7 @@ export async function uploadVictimDocument(
 export async function getVictimDocuments(
   organizationId: string,
   victimId: string,
-): Promise<{ data: Array<{ name: string; signedUrl: string }> | null; error: string | null }> {
+): Promise<{ data: Array<{ name: string; path: string; signedUrl: string }> | null; error: string | null }> {
   const supabase = await createServiceClient()
   const prefix = `${organizationId}/${victimId}/`
 
@@ -43,6 +43,7 @@ export async function getVictimDocuments(
     .filter((u) => u.signedUrl !== null)
     .map((u, i) => ({
       name: files[i].name,
+      path: paths[i],
       signedUrl: u.signedUrl as string,
     }))
 

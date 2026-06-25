@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import { useToast } from "@/components/toast-provider";
 
 function LoginForm() {
   const [email, setEmail]       = useState("");
@@ -14,6 +15,7 @@ function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const redirectTo = searchParams.get("redirectTo") || "/dashboard";
+  const toast = useToast();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -27,14 +29,17 @@ function LoginForm() {
     });
 
     if (authError) {
-      setError(
+      const msg =
         authError.message === "Invalid login credentials"
           ? "Credenciales inválidas. Intente nuevamente."
-          : authError.message,
-      );
+          : authError.message;
+      setError(msg);
+      toast.error(msg);
       setLoading(false);
       return;
     }
+
+    toast.success("Sesión iniciada");
 
     router.push(redirectTo);
     router.refresh();
@@ -70,7 +75,7 @@ function LoginForm() {
 
           <hr className="border-border mb-6" />
 
-          <h1 className="text-2xl font-semibold text-center text-gray-900 mb-6">
+          <h1 className="font-display text-2xl font-semibold text-center text-gray-900 mb-6">
             Iniciar sesión
           </h1>
 

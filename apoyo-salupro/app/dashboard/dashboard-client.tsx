@@ -1,22 +1,58 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Image from "next/image";
+import { useRouter, useSearchParams } from "next/navigation";
 import { TabFicha }        from "./tabs/tab-ficha";
 import { TabDesaparecidos } from "./tabs/tab-desaparecidos";
 import { TabTriaje }       from "./tabs/tab-triaje";
+import { TabPacientes }    from "./tabs/tab-pacientes";
+import { PatientModal }    from "./patient-modal";
 
-type Tab = "ficha" | "desaparecidos" | "triaje";
+type Tab = "ficha" | "pacientes" | "desaparecidos" | "triaje";
 
 const TABS: { id: Tab; label: string; icon: string }[] = [
-  { id: "ficha",         label: "Ficha Médica",         icon: "📋" },
+  { id: "ficha",         label: "Ficha Médica",           icon: "📋" },
+  { id: "pacientes",     label: "Pacientes",              icon: "👥" },
   { id: "desaparecidos", label: "Personas Desaparecidas", icon: "🔍" },
-  { id: "triaje",        label: "Triaje",               icon: "🏥" },
+  { id: "triaje",        label: "Triaje",                 icon: "🏥" },
 ];
 
 export function DashboardClient() {
-  const [activeTab, setActiveTab] = useState<Tab>("ficha");
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const initialTab = searchParams.get("tab");
+  const pacienteParam = searchParams.get("paciente");
+  const [activeTab, setActiveTab] = useState<Tab>(
+    initialTab === "pacientes" || initialTab === "desaparecidos" || initialTab === "triaje"
+      ? initialTab
+      : "ficha",
+  );
   const [clock, setClock]         = useState("");
+  const [selectedPatientId, setSelectedPatientId] = useState<string | null>(pacienteParam);
+  const [patientsRefreshKey, setPatientsRefreshKey] = useState(0);
+
+  useEffect(() => {
+    if (pacienteParam) {
+      setSelectedPatientId(pacienteParam);
+      setActiveTab("pacientes");
+    }
+  }, [pacienteParam]);
+
+  const openPatient = useCallback((id: string) => {
+    setSelectedPatientId(id);
+    setActiveTab("pacientes");
+    router.replace(`/dashboard?tab=pacientes&paciente=${id}`, { scroll: false });
+  }, [router]);
+
+  const closePatient = useCallback(() => {
+    setSelectedPatientId(null);
+    router.replace("/dashboard?tab=pacientes", { scroll: false });
+  }, [router]);
+
+  const handlePatientUpdated = useCallback(() => {
+    setPatientsRefreshKey((k) => k + 1);
+  }, []);
 
   useEffect(() => {
     const tick = () =>
@@ -43,7 +79,7 @@ export function DashboardClient() {
               className="shrink-0"
             />
             <div className="min-w-0">
-              <p className="text-xs font-bold text-primary uppercase tracking-widest leading-none">
+              <p className="font-display text-xs font-bold text-primary uppercase tracking-widest leading-none">
                 Apoyo SaluPro
               </p>
               <p className="text-[11px] text-gray-500 leading-tight truncate">
@@ -103,9 +139,23 @@ export function DashboardClient() {
       {/* ── Content ───────────────────────────────────────────────────── */}
       <main className="flex-1 max-w-5xl mx-auto w-full px-4 sm:px-6 py-6">
         {activeTab === "ficha"         && <TabFicha />}
+        {activeTab === "pacientes"     && (
+          <TabPacientes
+            key={patientsRefreshKey}
+            onOpenPatient={openPatient}
+          />
+        )}
         {activeTab === "desaparecidos" && <TabDesaparecidos />}
         {activeTab === "triaje"        && <TabTriaje />}
       </main>
+
+      {selectedPatientId && (
+        <PatientModal
+          victimId={selectedPatientId}
+          onClose={closePatient}
+          onUpdated={handlePatientUpdated}
+        />
+      )}
 
       {/* ── Footer ────────────────────────────────────────────────────── */}
       <footer className="bg-gray-800 text-gray-400 text-center py-3 text-xs border-t border-gray-700">
