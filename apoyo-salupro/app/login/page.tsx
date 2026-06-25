@@ -1,29 +1,43 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
+import Link from "next/link";
+import { createClient } from "@/lib/supabase/client";
 
-export default function LoginPage() {
+function LoginForm() {
   const [email, setEmail]       = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading]   = useState(false);
   const [error, setError]       = useState("");
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const redirectTo = searchParams.get("redirectTo") || "/dashboard";
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
     setLoading(true);
 
-    await new Promise((r) => setTimeout(r, 600));
+    const supabase = createClient();
+    const { error: authError } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
 
-    if (email && password) {
-      router.push("/dashboard");
-    } else {
-      setError("Credenciales inválidas. Intente nuevamente.");
+    if (authError) {
+      setError(
+        authError.message === "Invalid login credentials"
+          ? "Credenciales inválidas. Intente nuevamente."
+          : authError.message,
+      );
       setLoading(false);
+      return;
     }
+
+    router.push(redirectTo);
+    router.refresh();
   };
 
   return (
@@ -123,14 +137,22 @@ export default function LoginPage() {
         </div>
 
         <div className="px-8 py-4 border-t border-border text-center">
-          <p className="text-xs text-primary font-medium">
-            © {new Date().getFullYear()} Apoyo SaluPro
-          </p>
-          <p className="text-[11px] text-gray-400 mt-0.5">
+          <Link href="/" className="text-xs text-primary font-medium hover:underline">
+            ← Volver al portal público
+          </Link>
+          <p className="text-[11px] text-gray-400 mt-1">
             Sistema local de emergencias · Estado La Guaira
           </p>
         </div>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <LoginForm />
+    </Suspense>
   );
 }
