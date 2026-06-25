@@ -560,9 +560,13 @@ function SiteFooter() {
             className="group inline-flex items-center gap-2.5 text-xs"
           >
             <span className="text-gray-500">Desarrollado por</span>
-            <Image src="/nextec.svg" alt="nextec.plus" width={20} height={20} className="h-5 w-5 transition-transform group-hover:rotate-90" />
-            <span className="font-semibold text-gray-200 group-hover:text-white transition-colors tracking-wide">
-              nextec.plus
+            <Image src="/nextec.svg" alt="nextec" width={20} height={20} className="h-5 w-5 transition-transform group-hover:rotate-90" />
+            <span className="font-semibold text-gray-200 group-hover:text-white transition-colors tracking-wide lowercase">
+              nexte
+              <span className="relative inline-block">
+                <span aria-hidden className="absolute -top-1.5 -left-1 text-[0.62em] font-bold leading-none">+</span>
+                c
+              </span>
             </span>
           </a>
         </div>
