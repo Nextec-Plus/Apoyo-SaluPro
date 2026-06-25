@@ -5,16 +5,18 @@ import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
 import { TabFicha }        from "./tabs/tab-ficha";
 import { TabDesaparecidos } from "./tabs/tab-desaparecidos";
+import { TabEncontrados }  from "./tabs/tab-encontrados";
 import { TabTriaje }       from "./tabs/tab-triaje";
 import { TabPacientes }    from "./tabs/tab-pacientes";
 import { PatientModal }    from "./patient-modal";
 
-type Tab = "ficha" | "pacientes" | "desaparecidos" | "triaje";
+type Tab = "ficha" | "pacientes" | "desaparecidos" | "encontrados" | "triaje";
 
 const TABS: { id: Tab; label: string; icon: string }[] = [
   { id: "ficha",         label: "Ficha Médica",           icon: "📋" },
   { id: "pacientes",     label: "Pacientes",              icon: "👥" },
   { id: "desaparecidos", label: "Personas Desaparecidas", icon: "🔍" },
+  { id: "encontrados",   label: "Encontrados",            icon: "✅" },
   { id: "triaje",        label: "Triaje",                 icon: "🏥" },
 ];
 
@@ -24,7 +26,7 @@ export function DashboardClient() {
   const initialTab = searchParams.get("tab");
   const pacienteParam = searchParams.get("paciente");
   const [activeTab, setActiveTab] = useState<Tab>(
-    initialTab === "pacientes" || initialTab === "desaparecidos" || initialTab === "triaje"
+    initialTab === "pacientes" || initialTab === "desaparecidos" || initialTab === "encontrados" || initialTab === "triaje"
       ? initialTab
       : "ficha",
   );
@@ -146,6 +148,9 @@ export function DashboardClient() {
           />
         )}
         {activeTab === "desaparecidos" && <TabDesaparecidos />}
+        {activeTab === "encontrados" && (
+          <TabEncontrados onOpenPatient={openPatient} />
+        )}
         {activeTab === "triaje"        && <TabTriaje />}
       </main>
 

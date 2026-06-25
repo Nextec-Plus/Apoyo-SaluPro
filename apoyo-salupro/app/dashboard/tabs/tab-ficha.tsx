@@ -11,6 +11,11 @@ import {
 } from "@/lib/config";
 import { TRIAGE_UPDATED_EVENT } from "@/lib/events";
 import {
+  formatFoundMatchesNotice,
+  notifyFoundMatches,
+} from "@/lib/found-matches-notice";
+import type { FoundMatchResult } from "@/lib/missing-person-match";
+import {
   DESTINOS,
   formatDestino,
   isReferidoHospital,
@@ -100,6 +105,8 @@ export function TabFicha() {
         throw new Error(victimJson.error ?? "No se pudo registrar al paciente");
       }
 
+      const foundMatches = (victimJson.found_matches ?? []) as FoundMatchResult[];
+
       const caseRes = await fetch("/api/catastrophe/cases", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -156,8 +163,11 @@ export function TabFicha() {
       setHospitalDestino("");
       setPendingFiles([]);
       window.dispatchEvent(new CustomEvent(TRIAGE_UPDATED_EVENT));
+      notifyFoundMatches(foundMatches);
+      const matchNotice = formatFoundMatchesNotice(foundMatches);
       toast.success(
-        `Paciente registrado (${categoria}). Ya aparece en el tablero de Triaje.`,
+        matchNotice ??
+          `Paciente registrado (${categoria}). Ya aparece en el tablero de Triaje.`,
       );
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Error al guardar el registro");
