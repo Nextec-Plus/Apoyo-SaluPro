@@ -44,28 +44,29 @@ export async function POST(request: NextRequest) {
     )
   }
 
-  if (!body.nombre) {
+  const nombre = body.nombre?.trim()
+  const apellido = body.apellido?.trim()
+
+  if (!nombre) {
     return Response.json({ data: null, error: 'nombre es requerido' }, { status: 400 })
   }
-  if (!body.apellido) {
+  if (!apellido) {
     return Response.json({ data: null, error: 'apellido es requerido' }, { status: 400 })
   }
-  if (!body.contacto_nombre) {
-    return Response.json({ data: null, error: 'contacto_nombre es requerido' }, { status: 400 })
-  }
-  if (!body.contacto_apellido) {
-    return Response.json({ data: null, error: 'contacto_apellido es requerido' }, { status: 400 })
-  }
-  if (!body.contacto_telefono_nacional && !body.contacto_telefono_internacional) {
-    return Response.json(
-      { data: null, error: 'Se requiere al menos un número de contacto (nacional o internacional)' },
-      { status: 400 },
-    )
+
+  // Los datos de contacto son opcionales. Las columnas contacto_nombre/apellido son
+  // NOT NULL en la base de datos, así que normalizamos los ausentes a cadena vacía.
+  const insert: InsertMissingPerson = {
+    ...body,
+    nombre,
+    apellido,
+    contacto_nombre: body.contacto_nombre?.trim() || '',
+    contacto_apellido: body.contacto_apellido?.trim() || '',
   }
 
   const { data, error } = await supabase
     .from('missing_persons')
-    .insert(body)
+    .insert(insert)
     .select()
     .single()
 
