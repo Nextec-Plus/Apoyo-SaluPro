@@ -221,7 +221,7 @@ export default function Landing() {
             <div className="animate-fade-up">
               <span className="inline-flex items-center gap-2 rounded-full bg-primary-light text-primary-dark text-xs font-semibold px-3 py-1.5 mb-6">
                 <span className="w-1.5 h-1.5 rounded-full bg-primary" />
-                Plataforma humanitaria · Estado La Guaira
+                Plataforma humanitaria · Venezuela
               </span>
 
               <h1 className="font-display text-4xl sm:text-6xl font-extrabold leading-[1.05] tracking-tight text-gray-900">
@@ -527,7 +527,7 @@ export default function Landing() {
               />
               <p className="mt-4 text-sm leading-relaxed max-w-xs">
                 Plataforma pública de búsqueda y reunificación de personas afectadas por catástrofes.
-                Estado La Guaira, Venezuela.
+                Venezuela.
               </p>
             </div>
 
@@ -552,7 +552,7 @@ export default function Landing() {
           </div>
 
           <div className="mt-12 pt-6 border-t border-white/10 flex flex-col sm:flex-row items-center justify-between gap-4">
-            <p className="text-xs">© {new Date().getFullYear()} Apoyo SaluPro · Sistema local de emergencias</p>
+            <p className="text-xs">© {new Date().getFullYear()} Apoyo SaluPro · Sistema de registro de personas desaparecidas</p>
 
             <a
               href="https://nextec.com"

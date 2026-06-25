@@ -141,7 +141,7 @@ function LoginForm() {
             ← Volver al portal público
           </Link>
           <p className="text-[11px] text-gray-400 mt-1">
-            Sistema local de emergencias · Estado La Guaira
+            Sistema de registro de personas desaparecidas · Venezuela
           </p>
         </div>
       </div>

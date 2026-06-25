@@ -17,7 +17,7 @@ const body = Public_Sans({
 export const metadata: Metadata = {
   title: "Apoyo SaluPro — Búsqueda y reunificación de personas",
   description:
-    "Plataforma pública de búsqueda, registro y reunificación de personas afectadas por catástrofes — Estado La Guaira",
+    "Plataforma pública de búsqueda, registro y reunificación de personas afectadas por catástrofes — Venezuela",
 };
 
 export default function RootLayout({
