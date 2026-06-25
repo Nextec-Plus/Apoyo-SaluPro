@@ -1,8 +1,8 @@
 export const REFERIDO_HOSPITAL = "Referido al Hospital";
 
 export const DESTINOS = [
-  "Dado de alta (Ambulatorio)",
   "En observación en módulo móvil",
+  "Dado de alta (Ambulatorio)",
   REFERIDO_HOSPITAL,
   "Trasladado a Refugio Oficial",
 ] as const;
