@@ -1,26 +1,72 @@
 @import "tailwindcss";
 
+/* ── SaluPro Design Tokens ─────────────────────────────────────────────── */
+@theme {
+  /* Marca SaluPro: verde bosque */
+  --color-primary:          #2d6a2d;
+  --color-primary-dark:     #1d5220;
+  --color-primary-light:    #e8f5e9;
+  --color-primary-ring:     #66bb6a;
+
+  /* Crisis / Emergencia */
+  --color-crisis:           #c62828;
+  --color-crisis-dark:      #b71c1c;
+  --color-crisis-light:     #ffebee;
+
+  /* Triaje */
+  --color-triage-red:       #ef4444;
+  --color-triage-yellow:    #f59e0b;
+  --color-triage-green:     #16a34a;
+
+  /* Superficies */
+  --color-card:             #ffffff;
+  --color-muted:            #f9fafb;
+  --color-muted-fg:         #6b7280;
+  --color-border:           #e5e7eb;
+
+  /* Radio */
+  --radius:                 0.75rem;
+  --radius-sm:              0.5rem;
+  --radius-lg:              1rem;
+
+  /* Tipografía */
+  --font-sans:    var(--font-body);
+  --font-display: var(--font-display);
+}
+
 :root {
   --background: #ffffff;
-  --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --foreground: #111827;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-body), system-ui, -apple-system, BlinkMacSystemFont,
+    'Segoe UI', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
+
+.font-display {
+  font-family: var(--font-display), var(--font-body), sans-serif;
+}
+
+/* Entrada del hero */
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-up {
+  animation: fade-up 0.7s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* Scrollbar elegante */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #d1d5db transparent;
+}
+::-webkit-scrollbar       { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 9999px; }
+::-webkit-scrollbar-thumb:hover { background: #9ca3af; }
