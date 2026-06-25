@@ -2,19 +2,32 @@ import type { NextRequest } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import type { CareState, InsertCatastropheVictim, TriageCategory } from '@/lib/types/database'
 import { syncMissingPersonMatches } from '@/lib/missing-person-match'
+import {
+  applyVictimSearch,
+  hasVictimSearchIndex,
+} from '@/lib/catastrophe-victims-search'
+
+/**
+ * Tope de filas del modo legacy (GET sin `limit`). El modo legacy es interno y
+ * está deprecado: devolvía la tabla entera, lo que a escala (miles de filas) es
+ * una bomba de memoria/latencia. Los consumidores reales usan paginación o el
+ * cliente Supabase directo; este tope acota cualquier llamada legacy residual.
+ */
+const LEGACY_MAX_ROWS = 1000
 
 /**
  * GET /api/catastrophe/victims
  *
  * Cursor-paginated. Backwards compatible:
- *  - Si NO se envía `limit`, devuelve TODO en `data` (modo legacy).
+ *  - Si NO se envía `limit`, modo legacy (interno/deprecado): hasta
+ *    LEGACY_MAX_ROWS filas en `data`, sin paginar.
  *  - Si se envía `limit`, devuelve { items, next_cursor, has_more, error }.
  *
  * Filtros server-side:
  *  - triage_level : Verde | Amarillo | Rojo (trae todos por defecto)
  *  - care_state   : estado_destino exacto
  *  - cedula       : exacta
- *  - search        : nombre_completo ilike
+ *  - search       : texto libre, tokenizado y acento-insensible (search_index)
  *  - limit / cursor (compuesto: created_at,id) → cursor pagination.
  *
  * Optimización para lista virtualizada de pacientes: solo se traen `limit`
@@ -40,16 +53,21 @@ export async function GET(request: NextRequest) {
     return Response.json({ data: null, error: 'organization_id es requerido' }, { status: 400 })
   }
 
-  // ── Modo legacy (lista completa, lo usa el match/match-sync etc.) ───────
+  // ¿Está disponible la columna acento-insensible `search_index` (migración 007)?
+  const useIndex = search ? await hasVictimSearchIndex(supabase) : false
+
+  // ── Modo legacy (DEPRECADO / interno) ────────────────────────────────────
+  // No pagina; topado a LEGACY_MAX_ROWS para no devolver la tabla entera.
   if (limitParam === null) {
     let query = supabase
       .from('catastrophe_victims')
       .select('*, catastrophe_victim_info(*)')
       .eq('organization_id', organization_id)
       .order('created_at', { ascending: false })
+      .limit(LEGACY_MAX_ROWS)
 
     if (cedula) query = query.eq('cedula', cedula)
-    if (search) query = query.ilike('nombre_completo', `%${search}%`)
+    if (search) query = applyVictimSearch(query, search, useIndex)
 
     const { data, error } = await query
     if (error) return Response.json({ data: null, error: error.message }, { status: 500 })
@@ -71,7 +89,7 @@ export async function GET(request: NextRequest) {
     .limit(limit)
 
   if (cedula) query = query.ilike('cedula', `%${cedula}%`)
-  if (search) query = query.ilike('nombre_completo', `%${search}%`)
+  if (search) query = applyVictimSearch(query, search, useIndex)
   if (genero) query = query.eq('genero', genero)
   if (edadMin) query = query.gte('edad', Number(edadMin))
   if (edadMax) query = query.lte('edad', Number(edadMax))

@@ -1,5 +1,5 @@
 import type { NextRequest } from 'next/server'
-import { createServiceClient } from '@/lib/supabase/server'
+import { createClient } from '@/lib/supabase/server'
 import { getOrganizationId } from '@/lib/config'
 import {
   applyMissingPersonSearch,
@@ -9,6 +9,14 @@ import type {
   InsertMissingPerson,
   MissingPersonStatus,
 } from '@/lib/types/database'
+
+/**
+ * Tope de filas del modo legacy (GET sin `limit`). El modo legacy es interno y
+ * está deprecado: devolvía la tabla entera (2000+ filas), una bomba de
+ * memoria/latencia. Los consumidores reales usan paginación; este tope acota
+ * cualquier llamada legacy residual.
+ */
+const LEGACY_MAX_ROWS = 1000
 
 /**
  * GET /api/missing-persons
@@ -33,7 +41,9 @@ import type {
  *  - Cursor compuesto (created_at,id) → sin saltos ni duplicados en empates.
  */
 export async function GET(request: NextRequest) {
-  const supabase = await createServiceClient()
+  // Cliente anónimo: el listado público está protegido por RLS (select público).
+  // No usamos service_role en rutas públicas para no bypassar RLS.
+  const supabase = await createClient()
   const { searchParams } = request.nextUrl
 
   const organization_id = searchParams.get('organization_id')
@@ -66,13 +76,15 @@ export async function GET(request: NextRequest) {
     return query
   }
 
-  // ── Modo legacy (sin paginación) ─────────────────────────────────────────
+  // ── Modo legacy (DEPRECADO / interno) ────────────────────────────────────
+  // No pagina; topado a LEGACY_MAX_ROWS para no devolver la tabla entera.
   if (limitParam === null) {
     const query = applyFilters(
       supabase
         .from('missing_persons')
         .select('*, missing_person_images(*)')
-        .order('created_at', { ascending: false }),
+        .order('created_at', { ascending: false })
+        .limit(LEGACY_MAX_ROWS),
     )
 
     const { data, error } = await query
@@ -171,7 +183,9 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const supabase = await createServiceClient()
+  // Reporte público: cliente anónimo para que RLS aplique (insert público
+  // permitido por policy). No usamos service_role aquí para no bypassar RLS.
+  const supabase = await createClient()
 
   let body: InsertMissingPerson
   try {
