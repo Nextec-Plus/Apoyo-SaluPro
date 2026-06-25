@@ -65,7 +65,13 @@ export function DashboardClient() {
   }, []);
 
   return (
-    <div className="flex flex-col min-h-screen bg-muted">
+    <div
+      className={
+        activeTab === "triaje"
+          ? "flex flex-col h-dvh overflow-hidden bg-muted"
+          : "flex flex-col min-h-screen bg-muted"
+      }
+    >
 
       {/* ── Header ────────────────────────────────────────────────────── */}
       <header className="bg-white border-b border-border shadow-sm sticky top-0 z-50">
@@ -139,7 +145,14 @@ export function DashboardClient() {
       </nav>
 
       {/* ── Content ───────────────────────────────────────────────────── */}
-      <main className="flex-1 max-w-5xl mx-auto w-full px-4 sm:px-6 py-6">
+      <main
+        className={[
+          "flex-1 max-w-5xl mx-auto w-full px-4 sm:px-6",
+          activeTab === "triaje"
+            ? "py-3 min-h-0 overflow-hidden flex flex-col"
+            : "py-6",
+        ].join(" ")}
+      >
         {activeTab === "ficha"         && <TabFicha />}
         {activeTab === "pacientes"     && (
           <TabPacientes

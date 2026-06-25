@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useToast } from "@/components/toast-provider";
 import { TRIAGE_UPDATED_EVENT } from "@/lib/events";
 import type { CareState, CatastropheVictim, CatastropheVictimInfo, TriageCategory } from "@/lib/types/database";
@@ -211,6 +211,34 @@ type PendingMove = {
 };
 
 const PATCH_DEBOUNCE_MS = 350;
+const COLUMN_PAGE_SIZE = 20;
+
+function matchesSearch(caso: TriageCase, query: string): boolean {
+  const q = query.trim().toLowerCase();
+  if (!q) return true;
+
+  const victim = caso.catastrophe_victims;
+  const haystack = [
+    victim?.nombre_completo,
+    victim?.cedula,
+    victim?.sector_comunidad,
+    caso.motivo_principal_consulta,
+    victim?.registration_number,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+
+  return haystack.includes(q);
+}
+
+function initialVisibleCounts(): Record<ColumnId, number> {
+  return {
+    Verde: COLUMN_PAGE_SIZE,
+    Amarillo: COLUMN_PAGE_SIZE,
+    Rojo: COLUMN_PAGE_SIZE,
+  };
+}
 
 export function TabTriaje() {
   const toast = useToast();
@@ -222,6 +250,8 @@ export function TabTriaje() {
   const [pendingMovesUI, setPendingMovesUI] = useState<
     Map<string, PendingMoveUI>
   >(() => new Map());
+  const [search, setSearch] = useState("");
+  const [visibleCounts, setVisibleCounts] = useState(initialVisibleCounts);
 
   const casesRef = useRef(cases);
   casesRef.current = cases;
@@ -479,43 +509,84 @@ export function TabTriaje() {
     }, 0);
   }, []);
 
-  const byCategory = (category: ColumnId) =>
-    cases.filter((c) => c.triage_category === category);
+  const filteredCases = useMemo(
+    () => cases.filter((c) => matchesSearch(c, search)),
+    [cases, search],
+  );
+
+  const byCategory = useCallback(
+    (category: ColumnId) =>
+      filteredCases.filter((c) => c.triage_category === category),
+    [filteredCases],
+  );
+
+  useEffect(() => {
+    setVisibleCounts(initialVisibleCounts());
+  }, [search]);
+
+  const handleColumnScroll = useCallback(
+    (columnId: ColumnId, e: React.UIEvent<HTMLDivElement>) => {
+      const el = e.currentTarget;
+      const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+      if (!nearBottom) return;
+
+      const total = byCategory(columnId).length;
+      setVisibleCounts((prev) => {
+        if (prev[columnId] >= total) return prev;
+        return {
+          ...prev,
+          [columnId]: Math.min(prev[columnId] + COLUMN_PAGE_SIZE, total),
+        };
+      });
+    },
+    [byCategory],
+  );
 
   const pendingList = Array.from(pendingMovesUI.entries());
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-border p-6">
-      <div className="border-b border-border pb-3 mb-6 flex items-center justify-between gap-3">
-        <div>
-          <h2 className="text-lg font-bold text-gray-800">Tablero de Triaje</h2>
-          <p className="text-xs text-gray-500 mt-0.5">
-            Arrastra las tarjetas entre columnas para reclasificar pacientes.
-          </p>
+    <div className="flex flex-col flex-1 min-h-0 bg-white rounded-xl shadow-sm border border-border p-4 sm:p-5 overflow-hidden">
+      <div className="shrink-0 border-b border-border pb-3 mb-3 space-y-3">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-bold text-gray-800">Tablero de Triaje</h2>
+            <p className="text-xs text-gray-500 mt-0.5">
+              Arrastra las tarjetas entre columnas para reclasificar pacientes.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => loadCases(true)}
+            disabled={refreshing}
+            className="shrink-0 text-xs font-semibold text-primary border border-primary/30 rounded-lg px-3 py-1.5 hover:bg-primary-light transition-colors disabled:opacity-50"
+          >
+            {refreshing ? "Actualizando…" : "↻ Actualizar"}
+          </button>
         </div>
-        <button
-          type="button"
-          onClick={() => loadCases(true)}
-          disabled={refreshing}
-          className="shrink-0 text-xs font-semibold text-primary border border-primary/30 rounded-lg px-3 py-1.5 hover:bg-primary-light transition-colors disabled:opacity-50"
-        >
-          {refreshing ? "Actualizando…" : "↻ Actualizar"}
-        </button>
+        <input
+          type="search"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Buscar por nombre, cédula, sector o motivo…"
+          className="w-full sm:max-w-md text-sm bg-muted border border-border rounded-lg px-3 py-2.5 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-ring focus:border-primary"
+        />
       </div>
 
       {loading ? (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="flex-1 min-h-0 grid h-full grid-cols-1 md:grid-cols-3 gap-3 grid-rows-[repeat(3,minmax(0,1fr))] md:grid-rows-1">
           {COLUMNAS.map((col) => (
             <div
               key={col.id}
-              className={`rounded-xl border-2 ${col.color} bg-muted p-4 min-h-[240px] animate-pulse`}
+              className={`h-full min-h-0 rounded-xl border-2 ${col.color} bg-muted animate-pulse`}
             />
           ))}
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="flex-1 min-h-0 grid h-full grid-cols-1 md:grid-cols-3 gap-3 grid-rows-[repeat(3,minmax(0,1fr))] md:grid-rows-1">
           {COLUMNAS.map((col) => {
             const items = byCategory(col.id);
+            const visibleItems = items.slice(0, visibleCounts[col.id]);
+            const hasMore = visibleItems.length < items.length;
             const isDropTarget = dragOverColumn === col.id;
 
             return (
@@ -525,12 +596,12 @@ export function TabTriaje() {
                 onDragOver={handleBoardDragOver}
                 onDrop={(e) => handleColumnDrop(e, col.id)}
                 className={[
-                  "relative rounded-xl border-2 bg-muted overflow-hidden transition-shadow",
+                  "relative flex flex-col h-full min-h-0 rounded-xl border-2 bg-muted overflow-hidden transition-shadow",
                   col.color,
                   isDropTarget ? col.dropHighlight : "",
                 ].join(" ")}
               >
-                <div className="px-4 py-3 flex items-center justify-between border-b border-border bg-white/60">
+                <div className="shrink-0 px-4 py-3 flex items-center justify-between border-b border-border bg-white/60">
                   <div>
                     <p className="text-sm font-bold text-gray-800">{col.label}</p>
                     <p className="text-[11px] text-gray-500">{col.sub}</p>
@@ -542,9 +613,12 @@ export function TabTriaje() {
                   </span>
                 </div>
 
-                <div className="relative px-3 py-3 space-y-2 min-h-[200px]">
+                <div
+                  className="relative flex-1 min-h-0 overflow-y-auto px-3 py-3 space-y-2 overscroll-contain"
+                  onScroll={(e) => handleColumnScroll(col.id, e)}
+                >
                   {isDropTarget && (
-                    <div className="pointer-events-none absolute inset-2 z-20 rounded-lg border-2 border-dashed border-primary/40 flex items-center justify-center">
+                    <div className="pointer-events-none sticky top-0 inset-x-0 z-20 mb-2 rounded-lg border-2 border-dashed border-primary/40 flex items-center justify-center py-6 bg-primary/5">
                       <span className="text-xs font-semibold text-primary bg-white/90 px-2 py-1 rounded shadow-sm">
                         Soltar en {col.id}
                       </span>
@@ -553,11 +627,13 @@ export function TabTriaje() {
 
                   {items.length === 0 && !isDropTarget && (
                     <p className="text-xs text-gray-400 text-center py-8">
-                      Sin pacientes en esta categoría
+                      {search.trim()
+                        ? "Sin resultados en esta categoría"
+                        : "Sin pacientes en esta categoría"}
                     </p>
                   )}
 
-                  {items.map((caso) => (
+                  {visibleItems.map((caso) => (
                     <PatientCard
                       key={caso.id}
                       caso={caso}
@@ -568,6 +644,12 @@ export function TabTriaje() {
                       onMoveTo={moveCase}
                     />
                   ))}
+
+                  {hasMore && (
+                    <p className="text-[11px] text-gray-400 text-center py-2">
+                      Desplázate para ver más ({visibleItems.length} de {items.length})
+                    </p>
+                  )}
                 </div>
               </div>
             );
@@ -577,7 +659,7 @@ export function TabTriaje() {
 
       {pendingList.length > 0 && (
         <div
-          className="mt-4 rounded-lg border border-primary/25 bg-primary/5 px-4 py-3"
+          className="shrink-0 mt-3 max-h-24 overflow-y-auto overscroll-contain rounded-lg border border-primary/25 bg-primary/5 px-4 py-2"
           role="status"
           aria-live="polite"
         >
@@ -603,8 +685,14 @@ export function TabTriaje() {
       )}
 
       {!loading && cases.length === 0 && (
-        <p className="mt-4 text-center text-xs text-gray-400">
+        <p className="shrink-0 mt-2 text-center text-xs text-gray-400">
           No hay pacientes registrados en triaje. Los ingresos desde Ficha Médica aparecerán aquí.
+        </p>
+      )}
+
+      {!loading && cases.length > 0 && filteredCases.length === 0 && search.trim() && (
+        <p className="shrink-0 mt-2 text-center text-xs text-gray-400">
+          Sin resultados para &ldquo;{search.trim()}&rdquo;
         </p>
       )}
     </div>
