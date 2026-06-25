@@ -142,9 +142,6 @@ export default function ReportarPage() {
 
       <main className="mx-auto max-w-3xl px-4 py-10">
         <div className="mb-8">
-          <span className="inline-flex items-center gap-2 rounded-full bg-crisis-light text-crisis text-xs font-semibold px-3 py-1.5 mb-4">
-            Reporte público · sin necesidad de cuenta
-          </span>
           <h1 className="font-display text-3xl sm:text-4xl font-bold tracking-tight">
             Reportar persona desaparecida
           </h1>

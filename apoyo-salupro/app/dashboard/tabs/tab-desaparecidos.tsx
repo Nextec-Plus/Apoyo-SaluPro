@@ -1,15 +1,25 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import Image from "next/image";
+import { useEffect, useRef, useState } from "react";
 import { useToast } from "@/components/toast-provider";
-import {
-  type MissingPersonWithImages,
-  firstImageUrl,
-  STATUS_META,
-} from "@/lib/missing-persons";
 import type { InsertMissingPerson } from "@/lib/types/database";
+import type { MissingPersonSearchItem } from "@/lib/search/types";
+import { missingPersonsConfig } from "@/lib/search/configs";
+import { SearchProvider } from "@/components/search/SearchProvider";
+import {
+  ActiveChips,
+  FilterPanel,
+  ResultCount,
+  ResultsGrid,
+  ResultsState,
+  SearchBar,
+} from "@/components/search/ui";
+import {
+  MissingPersonCard,
+  MissingPersonCardSkeleton,
+} from "@/components/search/MissingPersonCard";
 import { PersonModal } from "@/app/persona/person-modal";
+import type { PersonModalPerson } from "@/app/persona/person-modal";
 
 const inputCls =
   "w-full text-sm bg-white border border-border rounded-lg px-3 py-2.5 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-ring focus:border-primary transition-colors";
@@ -28,53 +38,103 @@ function Field({ label, required, children }: { label: string; required?: boolea
   );
 }
 
-function PersonIcon({ className = "" }: { className?: string }) {
+/* ── Tarjetas de estadísticas (datos reales del endpoint /stats) ─────────── */
+
+type Stats = { total: number; busquedas: number; encontradas: number };
+
+function StatCards({ stats, loading }: { stats: Stats; loading: boolean }) {
+  const cards = [
+    { v: stats.total, label: "Personas registradas", color: "text-gray-900", ring: "border-border" },
+    { v: stats.busquedas, label: "Aún buscadas", color: "text-crisis", ring: "border-crisis/20" },
+    { v: stats.encontradas, label: "Encontradas", color: "text-triage-green", ring: "border-triage-green/25" },
+  ];
   return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden>
-      <path d="M20 21a8 8 0 0 0-16 0M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z" />
-    </svg>
+    <div className="grid grid-cols-3 gap-2.5 sm:gap-3 mb-5">
+      {cards.map((c) => (
+        <div key={c.label} className={`rounded-xl border bg-white px-3 py-3 sm:px-4 sm:py-3.5 shadow-sm ${c.ring}`}>
+          <div className={`font-display text-xl sm:text-3xl font-extrabold tabular-nums ${c.color}`}>
+            {loading ? "—" : c.v.toLocaleString("es-VE")}
+          </div>
+          <div className="mt-0.5 text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider text-gray-500 leading-tight">
+            {c.label}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/* ── Listado de registros (grid de cards, mismo motor que la landing) ────── */
+
+function RegistrosList({ reloadToken }: { reloadToken: number }) {
+  const [selected, setSelected] = useState<PersonModalPerson | null>(null);
+  return (
+    // key fuerza un re-fetch limpio cuando se emite un nuevo reporte.
+    <SearchProvider key={reloadToken} config={missingPersonsConfig}>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div className="w-full sm:max-w-sm">
+          <SearchBar placeholder="Buscar por nombre, apellido o cédula…" accent="primary" />
+        </div>
+        <div className="flex items-end gap-3">
+          <FilterPanel layout="inline" />
+        </div>
+      </div>
+
+      <div className="mt-3 flex items-center justify-between gap-2">
+        <ActiveChips />
+        <ResultCount
+          loadingLabel="Cargando…"
+          formatter={(c) => `${c} resultado${c !== 1 ? "s" : ""}`}
+        />
+      </div>
+
+      <div className="mt-4">
+        <ResultsGrid
+          columns="sm:grid-cols-2 lg:grid-cols-3"
+          skeleton={<MissingPersonCardSkeleton imageHeight="h-[180px]" />}
+          skeletonCount={6}
+          renderItem={(p: MissingPersonSearchItem) => (
+            <MissingPersonCard
+              key={p.id}
+              p={p}
+              onOpen={setSelected}
+              accent="primary"
+              imageHeight="h-[200px]"
+            />
+          )}
+        />
+        <ResultsState emptyTitle="Ningún registro coincide con tu búsqueda." />
+      </div>
+
+      {selected && <PersonModal person={selected} onClose={() => setSelected(null)} />}
+    </SearchProvider>
   );
 }
 
 export function TabDesaparecidos() {
   const toast = useToast();
   const [view, setView] = useState<"reportar" | "registros">("reportar");
+  const [reloadToken, setReloadToken] = useState(0);
 
-  /* ── Listado de registros ──────────────────────────────────────────── */
-  const [persons, setPersons] = useState<MissingPersonWithImages[]>([]);
-  const [loadingList, setLoadingList] = useState(true);
-  const [listError, setListError] = useState(false);
-  const [q, setQ] = useState("");
-  const [selected, setSelected] = useState<MissingPersonWithImages | null>(null);
-
-  const loadList = useCallback(async () => {
-    setLoadingList(true);
-    setListError(false);
-    try {
-      const res = await fetch("/api/missing-persons");
-      const json = await res.json();
-      if (!res.ok || json.error) throw new Error(json.error || "Error al cargar");
-      setPersons((json.data ?? []) as MissingPersonWithImages[]);
-    } catch {
-      setListError(true);
-    } finally {
-      setLoadingList(false);
-    }
-  }, []);
+  /* ── Estadísticas globales ─────────────────────────────────────────── */
+  const [stats, setStats] = useState<Stats>({ total: 0, busquedas: 0, encontradas: 0 });
+  const [statsLoading, setStatsLoading] = useState(true);
 
   useEffect(() => {
-    loadList();
-  }, [loadList]);
-
-  const filtered = useMemo(() => {
-    const term = q.trim().toLowerCase();
-    if (!term) return persons;
-    return persons.filter(
-      (p) =>
-        `${p.nombre} ${p.apellido}`.toLowerCase().includes(term) ||
-        (p.cedula ?? "").toLowerCase().includes(term),
-    );
-  }, [persons, q]);
+    let active = true;
+    fetch("/api/missing-persons/stats", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((json) => {
+        if (active && !json.error) setStats(json);
+      })
+      .catch(() => {
+        /* silencioso: las tarjetas muestran el último valor conocido */
+      })
+      .finally(() => active && setStatsLoading(false));
+    return () => {
+      active = false;
+    };
+  }, [reloadToken]);
 
   /* ── Formulario ────────────────────────────────────────────────────── */
   const formRef = useRef<HTMLFormElement>(null);
@@ -164,7 +224,7 @@ export function TabDesaparecidos() {
 
       toast.success("Alerta emitida — el reporte quedó registrado.");
       resetForm();
-      await loadList();
+      setReloadToken((t) => t + 1); // refresca stats + listado
       setView("registros");
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Error inesperado";
@@ -202,7 +262,7 @@ export function TabDesaparecidos() {
               view === "registros" ? "bg-white text-primary shadow-sm" : "text-gray-500 hover:text-gray-800"
             }`}
           >
-            Registros {!loadingList && !listError ? `(${persons.length})` : ""}
+            Registros {!statsLoading ? `(${stats.total.toLocaleString("es-VE")})` : ""}
           </button>
         </div>
       </div>
@@ -313,96 +373,10 @@ export function TabDesaparecidos() {
         </form>
       ) : (
         <div>
-          <div className="relative mb-5">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2">
-              <path d="m21 21-4.3-4.3M11 19a8 8 0 1 1 0-16 8 8 0 0 1 0 16Z" />
-            </svg>
-            <input
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              placeholder="Buscar por nombre, apellido o cédula…"
-              className="w-full rounded-lg border border-border bg-muted/60 pl-11 pr-4 py-2.5 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-ring focus:border-primary transition-colors"
-            />
-          </div>
-
-          {loadingList ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {Array.from({ length: 6 }).map((_, i) => (
-                <div key={i} className="rounded-xl border border-border bg-muted/50 animate-pulse h-[110px]" />
-              ))}
-            </div>
-          ) : listError ? (
-            <div className="text-center py-12">
-              <p className="text-sm text-crisis bg-crisis-light border border-crisis/20 rounded-lg px-4 py-3 inline-block">
-                No se pudieron cargar los registros.
-              </p>
-              <div>
-                <button onClick={loadList} className="mt-4 text-sm font-semibold text-primary hover:text-primary-dark">
-                  Reintentar
-                </button>
-              </div>
-            </div>
-          ) : filtered.length === 0 ? (
-            <div className="text-center py-16 rounded-xl border border-dashed border-border">
-              <PersonIcon className="w-10 h-10 mx-auto text-gray-300 mb-3" />
-              <p className="text-gray-500 text-sm font-medium">
-                {persons.length === 0
-                  ? "Aún no hay reportes registrados."
-                  : "Ningún registro coincide con tu búsqueda."}
-              </p>
-              {persons.length === 0 && (
-                <button
-                  onClick={() => setView("reportar")}
-                  className="mt-4 text-sm font-semibold text-primary hover:text-primary-dark"
-                >
-                  Crear el primer reporte
-                </button>
-              )}
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {filtered.map((p) => {
-                const img = firstImageUrl(p);
-                const m = STATUS_META[p.estado];
-                return (
-                  <button
-                    key={p.id}
-                    type="button"
-                    onClick={() => setSelected(p)}
-                    className="group flex items-center gap-3 rounded-xl border border-border bg-white p-3 text-left hover:border-primary/40 hover:shadow-md transition-all"
-                  >
-                    <div className="relative w-16 h-16 shrink-0 rounded-lg overflow-hidden bg-primary-light">
-                      {img ? (
-                        <Image src={img} alt={`${p.nombre} ${p.apellido}`} fill sizes="64px" className="object-cover" />
-                      ) : (
-                        <div className="absolute inset-0 flex items-center justify-center text-primary/40">
-                          <PersonIcon className="w-7 h-7" />
-                        </div>
-                      )}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <h3 className="font-semibold text-sm text-gray-900 truncate">
-                        {p.nombre} {p.apellido}
-                      </h3>
-                      <p className="text-xs text-gray-500 truncate mt-0.5">
-                        {[p.edad_aproximada ? `${p.edad_aproximada} años` : null, p.ultimo_lugar_visto]
-                          .filter(Boolean)
-                          .join(" · ") || "Sin detalles"}
-                      </p>
-                      <span className={`mt-1.5 inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px] font-semibold ${m.chip}`}>
-                        <span className={`w-1.5 h-1.5 rounded-full ${m.dot}`} />
-                        {m.label}
-                      </span>
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          )}
+          <StatCards stats={stats} loading={statsLoading} />
+          <RegistrosList reloadToken={reloadToken} />
         </div>
       )}
-
-      {selected && <PersonModal person={selected} onClose={() => setSelected(null)} />}
     </div>
   );
 }

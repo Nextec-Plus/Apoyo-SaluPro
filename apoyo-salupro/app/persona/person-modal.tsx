@@ -7,6 +7,7 @@ import {
   missingPersonImageUrl,
   STATUS_META,
 } from "@/lib/missing-persons";
+import type { MissingPersonSearchItem } from "@/lib/search/types";
 
 function Field({ label, value }: { label: string; value?: string | number | null }) {
   if (value === null || value === undefined || value === "") return null;
@@ -18,11 +19,14 @@ function Field({ label, value }: { label: string; value?: string | number | null
   );
 }
 
+/** Acepta tanto el registro completo como el item ligero del search core. */
+export type PersonModalPerson = MissingPersonWithImages | MissingPersonSearchItem
+
 export function PersonModal({
   person,
   onClose,
 }: {
-  person: MissingPersonWithImages;
+  person: PersonModalPerson;
   onClose: () => void;
 }) {
   const m = STATUS_META[person.estado];
@@ -209,7 +213,7 @@ export function PersonModal({
             <div className="relative z-[1] mt-4 flex gap-2 pointer-events-auto">
               {images.map((img, i) => (
                 <button
-                  key={img.id}
+                  key={(img as { id?: string }).id ?? img.storage_path ?? i}
                   type="button"
                   onClick={() => setLightboxIndex(i)}
                   className={`w-14 h-14 rounded-lg overflow-hidden border-2 transition-colors ${

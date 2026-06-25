@@ -31,6 +31,16 @@ export function firstImageUrl(p: MissingPersonWithImages): string | null {
   return img ? missingPersonImageUrl(img.storage_path) : null;
 }
 
+/** Primera imagen a partir del item "ligero" que devuelve el cursor pagination. */
+export function firstImageUrlFromSearch(
+  p:
+    | { missing_person_images?: Array<{ storage_path: string }> }
+    | MissingPersonWithImages,
+): string | null {
+  const img = p.missing_person_images?.[0];
+  return img ? missingPersonImageUrl(img.storage_path) : null;
+}
+
 export const STATUS_META: Record<
   MissingPersonStatus,
   { label: string; dot: string; chip: string }
