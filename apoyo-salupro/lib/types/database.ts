@@ -228,6 +228,95 @@ export type Database = {
         }
         Relationships: []
       }
+      missing_persons: {
+        Row: {
+          id: string
+          organization_id: string | null
+          nombre: string
+          apellido: string
+          cedula: string | null
+          edad_aproximada: number | null
+          genero: string | null
+          ultimo_lugar_visto: string | null
+          informacion_adicional: string | null
+          estado: Database["public"]["Enums"]["missing_person_status"]
+          contacto_nombre: string
+          contacto_apellido: string
+          contacto_correo: string | null
+          contacto_telefono_nacional: string | null
+          contacto_telefono_internacional: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          organization_id?: string | null
+          nombre: string
+          apellido: string
+          cedula?: string | null
+          edad_aproximada?: number | null
+          genero?: string | null
+          ultimo_lugar_visto?: string | null
+          informacion_adicional?: string | null
+          estado?: Database["public"]["Enums"]["missing_person_status"]
+          contacto_nombre: string
+          contacto_apellido: string
+          contacto_correo?: string | null
+          contacto_telefono_nacional?: string | null
+          contacto_telefono_internacional?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          organization_id?: string | null
+          nombre?: string
+          apellido?: string
+          cedula?: string | null
+          edad_aproximada?: number | null
+          genero?: string | null
+          ultimo_lugar_visto?: string | null
+          informacion_adicional?: string | null
+          estado?: Database["public"]["Enums"]["missing_person_status"]
+          contacto_nombre?: string
+          contacto_apellido?: string
+          contacto_correo?: string | null
+          contacto_telefono_nacional?: string | null
+          contacto_telefono_internacional?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      missing_person_images: {
+        Row: {
+          id: string
+          missing_person_id: string
+          storage_path: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          missing_person_id: string
+          storage_path: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          missing_person_id?: string
+          storage_path?: string
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "missing_person_images_missing_person_id_fkey"
+            columns: ["missing_person_id"]
+            isOneToOne: false
+            referencedRelation: "missing_persons"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -253,6 +342,7 @@ export type Database = {
         | "datetime"
         | "file"
       triage_category: "Rojo" | "Amarillo" | "Verde"
+      missing_person_status: "Desaparecido" | "Encontrado" | "Confirmado Fallecido"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -403,7 +493,7 @@ export const Constants = {
   },
 } as const
 
-// Convenience aliases used across API routes
+// ── Convenience aliases used across API routes ────────────────────────────────
 export type TriageCategory = Database["public"]["Enums"]["triage_category"]
 export type CareState = Database["public"]["Enums"]["care_state"]
 export type FieldType = Database["public"]["Enums"]["field_type"]
@@ -423,3 +513,9 @@ export type UpdateCatastropheFamilyContact = TablesUpdate<"catastrophe_family_co
 export type CatastropheCareRequirement = Tables<"catastrophe_care_requirements">
 export type InsertCatastropheCareRequirement = TablesInsert<"catastrophe_care_requirements">
 export type UpdateCatastropheCareRequirement = TablesUpdate<"catastrophe_care_requirements">
+
+export type MissingPersonStatus = Database["public"]["Enums"]["missing_person_status"]
+export type MissingPerson = Tables<"missing_persons">
+export type InsertMissingPerson = TablesInsert<"missing_persons">
+export type UpdateMissingPerson = TablesUpdate<"missing_persons">
+export type MissingPersonImage = Tables<"missing_person_images">
