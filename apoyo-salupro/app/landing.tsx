@@ -98,15 +98,18 @@ export default function Landing() {
 
   useEffect(() => {
     let active = true;
-    fetch("/api/missing-persons/stats")
-      .then((r) => r.json())
-      .then((json) => {
-        if (!active) return;
-        if (!json.error) setStats(json);
-      })
-      .catch(() => {})
-      .finally(() => active && setStatsLoading(false));
-    return () => { active = false };
+    const load = () =>
+      fetch("/api/missing-persons/stats")
+        .then((r) => r.json())
+        .then((json) => { if (active && !json.error) setStats(json) })
+        .catch(() => {})
+        .finally(() => active && setStatsLoading(false));
+    load();
+    // Re-fetch stats cada 90 s cuando la pestaña está activa.
+    const id = setInterval(() => { if (document.visibilityState === "visible") load() }, 90_000);
+    const onVis = () => { if (document.visibilityState === "visible") load() };
+    document.addEventListener("visibilitychange", onVis);
+    return () => { active = false; clearInterval(id); document.removeEventListener("visibilitychange", onVis) };
   }, []);
 
   return (
@@ -115,7 +118,7 @@ export default function Landing() {
       <SiteHeader menu={menu} setMenu={setMenu} />
 
       <main className="flex-1">
-        <SearchProvider config={missingPersonsPagedConfig}>
+        <SearchProvider config={missingPersonsPagedConfig} autoRefreshMs={90_000}>
           <HeroSearchSection />
 
           <CountersSection stats={stats} loading={statsLoading} />
@@ -328,9 +331,9 @@ function CasosSection() {
 
         <div className="mt-4">
           <ResultsGrid
-            columns="sm:grid-cols-2 lg:grid-cols-3"
+            columns="sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
             skeleton={<MissingPersonCardSkeleton />}
-            skeletonCount={6}
+            skeletonCount={8}
             renderItem={(p: MissingPersonSearchItem) => (
               <MissingPersonCard
                 key={p.id}
@@ -405,12 +408,14 @@ function HowItWorksSection() {
   );
 }
 
-/* ── Alianza La Vaca ─────────────────────────────────────────────────────── */
+/* ── Alianzas ────────────────────────────────────────────────────────────── */
 
 function AlianzaSection() {
   return (
     <section id="alianza" className="bg-muted/50 border-b border-border scroll-mt-20">
-      <div className="mx-auto max-w-7xl px-4 py-16 sm:py-20">
+      <div className="mx-auto max-w-7xl px-4 py-16 sm:py-20 space-y-6">
+
+        {/* La Vaca — crowdfunding */}
         <div className="rounded-3xl border border-border bg-card overflow-hidden grid lg:grid-cols-[1.3fr_1fr]">
           <div className="p-8 sm:p-12">
             <span className="inline-flex items-center gap-2 rounded-full bg-primary-light text-primary-dark text-xs font-semibold px-3 py-1.5 mb-6">
@@ -478,6 +483,45 @@ function AlianzaSection() {
             </div>
           </div>
         </div>
+
+        {/* Venezuela te busca — plataforma ciudadana */}
+        <div className="rounded-3xl border border-border bg-card overflow-hidden grid md:grid-cols-[auto_1fr] items-center gap-0">
+          {/* Lateral de color */}
+          <div className="hidden md:flex flex-col items-center justify-center gap-3 bg-[#FDECEA] px-10 py-12 self-stretch rounded-l-3xl min-w-[200px]">
+            <span className="text-5xl select-none" aria-hidden>🇻🇪</span>
+            <span className="font-display text-sm font-bold text-[#C0392B] text-center leading-tight">
+              Venezuela<br />te busca
+            </span>
+          </div>
+
+          {/* Contenido */}
+          <div className="p-8 sm:p-10">
+            <span className="inline-flex items-center gap-2 rounded-full bg-[#FDECEA] text-[#C0392B] text-xs font-semibold px-3 py-1.5 mb-5">
+              <Icon path={I.heart} className="w-3.5 h-3.5" />
+              Alianza · Venezuela te busca
+            </span>
+            <h3 className="font-display text-2xl sm:text-3xl font-bold tracking-tight leading-tight">
+              Registro ciudadano de personas
+              <span className="text-[#C0392B]"> desaparecidas.</span>
+            </h3>
+            <p className="mt-4 text-gray-600 leading-relaxed max-w-2xl text-sm sm:text-base">
+              Iniciativa voluntaria y sin fines de lucro que complementa nuestra plataforma. Más de{" "}
+              <strong className="text-gray-900">25.000 personas</strong> registradas por ciudadanos
+              para ayudar a localizar a familiares desaparecidos tras el terremoto de Venezuela 2026.
+              Los datos son usados exclusivamente para la localización de personas.
+            </p>
+            <a
+              href="https://venezuela-te-busca-app.hellogafaro.workers.dev"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-6 inline-flex items-center gap-2 rounded-xl border border-[#C0392B]/30 text-[#C0392B] hover:bg-[#FDECEA] font-semibold px-5 py-2.5 text-sm transition-colors"
+            >
+              Visitar Venezuela te busca
+              <Icon path={I.arrow} className="w-4 h-4" />
+            </a>
+          </div>
+        </div>
+
       </div>
     </section>
   );
@@ -536,7 +580,7 @@ function SiteFooter() {
             <ul className="space-y-2.5 text-sm">
               <li><a href="#buscar" className="hover:text-white transition-colors">Buscar personas</a></li>
               <li><Link href="/reportar" className="hover:text-white transition-colors">Reportar desaparición</Link></li>
-              <li><a href="#alianza" className="hover:text-white transition-colors">Alianza La Vaca</a></li>
+              <li><a href="#alianza" className="hover:text-white transition-colors">Alianzas</a></li>
             </ul>
           </div>
 
