@@ -1,17 +1,18 @@
 import type { Metadata } from "next";
 import { Bricolage_Grotesque, Public_Sans } from "next/font/google";
+import { Providers } from "@/components/providers";
 import "./globals.css";
 
 const display = Bricolage_Grotesque({
   subsets: ["latin"],
   display: "swap",
-  variable: "--font-display",
+  variable: "--font-family-display",
 });
 
 const body = Public_Sans({
   subsets: ["latin"],
   display: "swap",
-  variable: "--font-body",
+  variable: "--font-family-body",
 });
 
 export const metadata: Metadata = {
@@ -28,7 +29,9 @@ export default function RootLayout({
       lang="es"
       className={`h-full antialiased ${display.variable} ${body.variable}`}
     >
-      <body className="min-h-full flex flex-col bg-card">{children}</body>
+      <body className="min-h-full flex flex-col bg-card font-sans antialiased">
+        <Providers>{children}</Providers>
+      </body>
     </html>
   );
 }

@@ -1,8 +1,9 @@
 import type { NextRequest } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
-import type { CareState } from '@/lib/types/database'
+import type { CareState, TriageCategory } from '@/lib/types/database'
 
 interface UpdateCaseBody {
+  triage_category?: TriageCategory
   estado_destino?: CareState
   motivo_principal_consulta?: string
   condiciones_preexistentes?: string

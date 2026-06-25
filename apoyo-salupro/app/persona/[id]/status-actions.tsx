@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useToast } from "@/components/toast-provider";
 import type { MissingPersonStatus } from "@/lib/types/database";
 
 export function StatusActions({
@@ -12,6 +13,7 @@ export function StatusActions({
   estado: MissingPersonStatus;
 }) {
   const router = useRouter();
+  const toast = useToast();
   const [open, setOpen] = useState(false);
   const [ubicacion, setUbicacion] = useState("");
   const [notas, setNotas] = useState("");
@@ -39,8 +41,19 @@ export function StatusActions({
       setUbicacion("");
       setNotas("");
       router.refresh();
+      toast.success(
+        nuevo === "Avistado"
+          ? "Avistamiento reportado"
+          : nuevo === "Encontrado"
+            ? "Marcada como encontrada"
+            : nuevo === "Confirmado Fallecido"
+              ? "Estado actualizado"
+              : "Reporte reabierto",
+      );
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Error inesperado");
+      const msg = err instanceof Error ? err.message : "Error inesperado";
+      setError(msg);
+      toast.error(msg);
     } finally {
       setLoading(null);
     }

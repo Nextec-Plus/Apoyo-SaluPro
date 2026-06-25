@@ -43,7 +43,7 @@ export function DashboardClient() {
               className="shrink-0"
             />
             <div className="min-w-0">
-              <p className="text-xs font-bold text-primary uppercase tracking-widest leading-none">
+              <p className="font-display text-xs font-bold text-primary uppercase tracking-widest leading-none">
                 Apoyo SaluPro
               </p>
               <p className="text-[11px] text-gray-500 leading-tight truncate">
