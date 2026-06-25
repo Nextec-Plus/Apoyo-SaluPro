@@ -342,7 +342,7 @@ export type Database = {
         | "datetime"
         | "file"
       triage_category: "Rojo" | "Amarillo" | "Verde"
-      missing_person_status: "Desaparecido" | "Encontrado" | "Confirmado Fallecido"
+      missing_person_status: "Desaparecido" | "Avistado" | "Encontrado" | "Confirmado Fallecido"
     }
     CompositeTypes: {
       [_ in never]: never
