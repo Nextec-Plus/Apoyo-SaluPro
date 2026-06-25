@@ -6,6 +6,11 @@ import { useToast } from "@/components/toast-provider";
 import { generoDbToUi, generoUiToDb, getClientOrganizationId } from "@/lib/config";
 import { TRIAGE_UPDATED_EVENT } from "@/lib/events";
 import {
+  formatFoundMatchesNotice,
+  notifyFoundMatches,
+} from "@/lib/found-matches-notice";
+import type { FoundMatchResult } from "@/lib/missing-person-match";
+import {
   DESTINOS,
   formatDestino,
   isReferidoHospital,
@@ -252,6 +257,8 @@ export function PatientModal({
       const victimJson = await victimRes.json();
       if (!victimRes.ok) throw new Error(victimJson.error ?? "Error al guardar paciente");
 
+      const foundMatches = (victimJson.found_matches ?? []) as FoundMatchResult[];
+
       const infoBody = {
         triage_category: form.triage_category,
         motivo_principal_consulta: form.motivo_principal_consulta.trim() || null,
@@ -277,7 +284,8 @@ export function PatientModal({
       const infoJson = await infoRes.json();
       if (!infoRes.ok) throw new Error(infoJson.error ?? "Error al guardar evaluación médica");
 
-      toast.success("Ficha actualizada");
+      toast.success(formatFoundMatchesNotice(foundMatches) ?? "Ficha actualizada");
+      notifyFoundMatches(foundMatches);
       setEditing(false);
       setForm(null);
       window.dispatchEvent(new CustomEvent(TRIAGE_UPDATED_EVENT));

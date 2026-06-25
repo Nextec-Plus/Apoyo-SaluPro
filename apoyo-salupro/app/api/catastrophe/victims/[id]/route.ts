@@ -1,6 +1,7 @@
 import type { NextRequest } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import type { UpdateCatastropheVictim } from '@/lib/types/database'
+import { syncMissingPersonMatches } from '@/lib/missing-person-match'
 
 export async function GET(
   _req: NextRequest,
@@ -52,7 +53,14 @@ export async function PATCH(
     return Response.json({ data: null, error: error.message }, { status })
   }
 
-  return Response.json({ data, error: null })
+  const found_matches = await syncMissingPersonMatches(supabase, {
+    id: data.id,
+    nombre_completo: data.nombre_completo,
+    cedula: data.cedula,
+    ubicacion_actual_refugio: data.ubicacion_actual_refugio,
+  })
+
+  return Response.json({ data, found_matches, error: null })
 }
 
 export async function DELETE(

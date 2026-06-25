@@ -240,6 +240,8 @@ export type Database = {
           ultimo_lugar_visto: string | null
           informacion_adicional: string | null
           estado: Database["public"]["Enums"]["missing_person_status"]
+          motivo_fallecimiento: string | null
+          fallecimiento_confirmado: boolean
           contacto_nombre: string
           contacto_apellido: string
           contacto_correo: string | null
@@ -259,6 +261,8 @@ export type Database = {
           ultimo_lugar_visto?: string | null
           informacion_adicional?: string | null
           estado?: Database["public"]["Enums"]["missing_person_status"]
+          motivo_fallecimiento?: string | null
+          fallecimiento_confirmado?: boolean
           contacto_nombre: string
           contacto_apellido: string
           contacto_correo?: string | null
@@ -278,6 +282,8 @@ export type Database = {
           ultimo_lugar_visto?: string | null
           informacion_adicional?: string | null
           estado?: Database["public"]["Enums"]["missing_person_status"]
+          motivo_fallecimiento?: string | null
+          fallecimiento_confirmado?: boolean
           contacto_nombre?: string
           contacto_apellido?: string
           contacto_correo?: string | null
@@ -317,6 +323,45 @@ export type Database = {
           },
         ]
       }
+      missing_person_found: {
+        Row: {
+          id: string
+          missing_person_id: string
+          catastrophe_victim_id: string
+          match_type: Database["public"]["Enums"]["missing_person_match_type"]
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          missing_person_id: string
+          catastrophe_victim_id: string
+          match_type: Database["public"]["Enums"]["missing_person_match_type"]
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          missing_person_id?: string
+          catastrophe_victim_id?: string
+          match_type?: Database["public"]["Enums"]["missing_person_match_type"]
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "missing_person_found_missing_person_id_fkey"
+            columns: ["missing_person_id"]
+            isOneToOne: false
+            referencedRelation: "missing_persons"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "missing_person_found_catastrophe_victim_id_fkey"
+            columns: ["catastrophe_victim_id"]
+            isOneToOne: false
+            referencedRelation: "catastrophe_victims"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -343,6 +388,7 @@ export type Database = {
         | "file"
       triage_category: "Rojo" | "Amarillo" | "Verde"
       missing_person_status: "Desaparecido" | "Avistado" | "Encontrado" | "Confirmado Fallecido"
+      missing_person_match_type: "cedula" | "nombre"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -515,7 +561,10 @@ export type InsertCatastropheCareRequirement = TablesInsert<"catastrophe_care_re
 export type UpdateCatastropheCareRequirement = TablesUpdate<"catastrophe_care_requirements">
 
 export type MissingPersonStatus = Database["public"]["Enums"]["missing_person_status"]
+export type MissingPersonMatchType = Database["public"]["Enums"]["missing_person_match_type"]
 export type MissingPerson = Tables<"missing_persons">
 export type InsertMissingPerson = TablesInsert<"missing_persons">
 export type UpdateMissingPerson = TablesUpdate<"missing_persons">
 export type MissingPersonImage = Tables<"missing_person_images">
+export type MissingPersonFound = Tables<"missing_person_found">
+export type InsertMissingPersonFound = TablesInsert<"missing_person_found">
