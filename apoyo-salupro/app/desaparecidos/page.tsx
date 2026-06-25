@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import {
@@ -10,7 +10,7 @@ import {
 } from "@/lib/missing-persons";
 import { PersonModal } from "@/app/persona/person-modal";
 
-const PAGE_SIZE = 12;
+const PAGE_SIZE = 16;
 
 function Icon({ path, className = "" }: { path: string; className?: string }) {
   return (
@@ -44,8 +44,8 @@ export default function DesaparecidosPage() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [selected, setSelected] = useState<MissingPersonWithImages | null>(null);
-  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
-  const sentinelRef = useRef<HTMLDivElement>(null);
+  const [page, setPage] = useState(0);
+  const gridRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     let active = true;
@@ -65,23 +65,8 @@ export default function DesaparecidosPage() {
   }, []);
 
   useEffect(() => {
-    setVisibleCount(PAGE_SIZE);
+    setPage(0);
   }, [q, tab]);
-
-  const loadMore = useCallback(() => {
-    setVisibleCount((c) => c + PAGE_SIZE);
-  }, []);
-
-  useEffect(() => {
-    const el = sentinelRef.current;
-    if (!el) return;
-    const io = new IntersectionObserver(
-      (entries) => { if (entries[0].isIntersecting) loadMore(); },
-      { rootMargin: "200px" },
-    );
-    io.observe(el);
-    return () => io.disconnect();
-  }, [loadMore]);
 
   const filtered = useMemo(() => {
     const term = q.trim().toLowerCase();
@@ -231,59 +216,90 @@ export default function DesaparecidosPage() {
                   Reportar una persona desaparecida
                 </Link>
               </div>
-            ) : (
-              <>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-5">
-                  {filtered.slice(0, visibleCount).map((p) => {
-                    const img = firstImageUrl(p);
-                    return (
-                      <button
-                        key={p.id}
-                        type="button"
-                        onClick={() => setSelected(p)}
-                        className="group flex flex-col rounded-2xl bg-card border border-border overflow-hidden text-left hover:border-crisis/40 hover:shadow-lg hover:shadow-crisis/5 transition-all"
-                      >
-                        <div className="relative w-full h-[260px] shrink-0 bg-crisis/5 overflow-hidden">
-                          {img ? (
-                            <Image
-                              src={img}
-                              alt={`${p.nombre} ${p.apellido}`}
-                              fill
-                              sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
-                              className="object-cover object-center group-hover:scale-[1.02] transition-transform duration-300"
-                            />
-                          ) : (
-                            <div className="absolute inset-0 flex items-center justify-center text-crisis/30">
-                              <Icon path={I.user} className="w-14 h-14" />
+            ) : (() => {
+                const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
+                const pageItems = filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
+                const goTo = (p: number) => {
+                  setPage(p);
+                  gridRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+                };
+                return (
+                  <>
+                    <div ref={gridRef} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-5">
+                      {pageItems.map((p) => {
+                        const img = firstImageUrl(p);
+                        return (
+                          <button
+                            key={p.id}
+                            type="button"
+                            onClick={() => setSelected(p)}
+                            className="group flex flex-col rounded-2xl bg-card border border-border overflow-hidden text-left hover:border-crisis/40 hover:shadow-lg hover:shadow-crisis/5 transition-all"
+                          >
+                            <div className="relative w-full h-[260px] shrink-0 bg-crisis/5 overflow-hidden">
+                              {img ? (
+                                <Image
+                                  src={img}
+                                  alt={`${p.nombre} ${p.apellido}`}
+                                  fill
+                                  sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
+                                  className="object-cover object-center group-hover:scale-[1.02] transition-transform duration-300"
+                                />
+                              ) : (
+                                <div className="absolute inset-0 flex items-center justify-center text-crisis/30">
+                                  <Icon path={I.user} className="w-14 h-14" />
+                                </div>
+                              )}
                             </div>
-                          )}
-                        </div>
-                        <div className="p-4 flex-1 flex flex-col">
-                          <h3 className="font-semibold text-[15px] leading-snug">{p.nombre} {p.apellido}</h3>
-                          <p className="text-xs text-gray-500 mt-1 line-clamp-2 flex-1">
-                            {[p.edad_aproximada ? `${p.edad_aproximada} años` : null, p.ultimo_lugar_visto]
-                              .filter(Boolean)
-                              .join(" · ") || "Sin detalles"}
-                          </p>
-                          <span className={`mt-2.5 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold self-start ${m.chip}`}>
-                            <span className={`w-1.5 h-1.5 rounded-full ${m.dot}`} />
-                            {m.label}
-                          </span>
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-                {visibleCount < filtered.length && (
-                  <div ref={sentinelRef} className="mt-10 flex justify-center">
-                    <div className="flex items-center gap-2 text-sm text-gray-400">
-                      <span className="w-4 h-4 border-2 border-crisis/30 border-t-crisis rounded-full animate-spin" />
-                      Cargando más registros…
+                            <div className="p-4 flex-1 flex flex-col">
+                              <h3 className="font-semibold text-[15px] leading-snug">{p.nombre} {p.apellido}</h3>
+                              <p className="text-xs text-gray-500 mt-1 line-clamp-2 flex-1">
+                                {[p.edad_aproximada ? `${p.edad_aproximada} años` : null, p.ultimo_lugar_visto]
+                                  .filter(Boolean)
+                                  .join(" · ") || "Sin detalles"}
+                              </p>
+                              <span className={`mt-2.5 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold self-start ${m.chip}`}>
+                                <span className={`w-1.5 h-1.5 rounded-full ${m.dot}`} />
+                                {m.label}
+                              </span>
+                            </div>
+                          </button>
+                        );
+                      })}
                     </div>
-                  </div>
-                )}
-              </>
-            )}
+                    {totalPages > 1 && (
+                      <div className="mt-10 flex flex-wrap items-center justify-center gap-2">
+                        <button
+                          onClick={() => goTo(page - 1)}
+                          disabled={page === 0}
+                          className="px-3 py-2 rounded-lg border border-border text-sm font-medium text-gray-600 hover:bg-muted disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                        >
+                          ← Anterior
+                        </button>
+                        {Array.from({ length: totalPages }).map((_, i) => (
+                          <button
+                            key={i}
+                            onClick={() => goTo(i)}
+                            className={`w-9 h-9 rounded-lg text-sm font-semibold transition-colors ${
+                              i === page
+                                ? "bg-crisis text-white"
+                                : "border border-border text-gray-600 hover:bg-muted"
+                            }`}
+                          >
+                            {i + 1}
+                          </button>
+                        ))}
+                        <button
+                          onClick={() => goTo(page + 1)}
+                          disabled={page === totalPages - 1}
+                          className="px-3 py-2 rounded-lg border border-border text-sm font-medium text-gray-600 hover:bg-muted disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                        >
+                          Siguiente →
+                        </button>
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
           </div>
         </section>
       </main>

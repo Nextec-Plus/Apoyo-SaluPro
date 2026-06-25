@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import type { MissingPersonStatus } from "@/lib/types/database";
@@ -99,8 +99,8 @@ export default function Landing() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [selected, setSelected] = useState<MissingPersonWithImages | null>(null);
-  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
-  const sentinelRef = useRef<HTMLDivElement>(null);
+  const [page, setPage] = useState(0);
+  const casosRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
     let active = true;
@@ -119,23 +119,8 @@ export default function Landing() {
   }, []);
 
   useEffect(() => {
-    setVisibleCount(PAGE_SIZE);
+    setPage(0);
   }, [q, estado, tab]);
-
-  const loadMore = useCallback(() => {
-    setVisibleCount((c) => c + PAGE_SIZE);
-  }, []);
-
-  useEffect(() => {
-    const el = sentinelRef.current;
-    if (!el) return;
-    const io = new IntersectionObserver(
-      (entries) => { if (entries[0].isIntersecting) loadMore(); },
-      { rootMargin: "200px" },
-    );
-    io.observe(el);
-    return () => io.disconnect();
-  }, [loadMore]);
 
   const stats = useMemo(() => {
     const total = persons.length;
@@ -337,7 +322,7 @@ export default function Landing() {
         </section>
 
         {/* ── Registros (datos reales) ────────────────────────────────── */}
-        <section id="casos" className="bg-card border-b border-border scroll-mt-20">
+        <section ref={casosRef} id="casos" className="bg-card border-b border-border scroll-mt-20">
           <div className="mx-auto max-w-7xl px-4 py-16 sm:py-20">
             <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mb-8">
               <div>
@@ -397,60 +382,91 @@ export default function Landing() {
                   Reportar una persona desaparecida
                 </Link>
               </div>
-            ) : (
-              <>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
-                  {filtered.slice(0, visibleCount).map((p) => {
-                    const m = STATUS_META[p.estado];
-                    const img = firstImageUrl(p);
-                    return (
-                      <button
-                        key={p.id}
-                        type="button"
-                        onClick={() => setSelected(p)}
-                        className="group flex flex-col rounded-2xl bg-card border border-border overflow-hidden text-left hover:border-primary/40 hover:shadow-lg hover:shadow-primary/5 transition-all"
-                      >
-                        <div className="relative w-full h-[300px] shrink-0 bg-primary-light overflow-hidden">
-                          {img ? (
-                            <Image
-                              src={img}
-                              alt={`${p.nombre} ${p.apellido}`}
-                              fill
-                              sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-                              className="object-cover object-center group-hover:scale-[1.02] transition-transform duration-300"
-                            />
-                          ) : (
-                            <div className="absolute inset-0 flex items-center justify-center text-primary/40">
-                              <Icon path={I.user} className="w-12 h-12" />
+            ) : (() => {
+                const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
+                const pageItems = filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
+                const goTo = (p: number) => {
+                  setPage(p);
+                  casosRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+                };
+                return (
+                  <>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
+                      {pageItems.map((p) => {
+                        const m = STATUS_META[p.estado];
+                        const img = firstImageUrl(p);
+                        return (
+                          <button
+                            key={p.id}
+                            type="button"
+                            onClick={() => setSelected(p)}
+                            className="group flex flex-col rounded-2xl bg-card border border-border overflow-hidden text-left hover:border-primary/40 hover:shadow-lg hover:shadow-primary/5 transition-all"
+                          >
+                            <div className="relative w-full h-[300px] shrink-0 bg-primary-light overflow-hidden">
+                              {img ? (
+                                <Image
+                                  src={img}
+                                  alt={`${p.nombre} ${p.apellido}`}
+                                  fill
+                                  sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                                  className="object-cover object-center group-hover:scale-[1.02] transition-transform duration-300"
+                                />
+                              ) : (
+                                <div className="absolute inset-0 flex items-center justify-center text-primary/40">
+                                  <Icon path={I.user} className="w-12 h-12" />
+                                </div>
+                              )}
                             </div>
-                          )}
-                        </div>
-                        <div className="p-4">
-                          <h3 className="font-semibold text-[15px] leading-snug">{p.nombre} {p.apellido}</h3>
-                          <p className="text-xs text-gray-500 mt-1 line-clamp-2">
-                            {[p.edad_aproximada ? `${p.edad_aproximada} años` : null, p.ultimo_lugar_visto]
-                              .filter(Boolean)
-                              .join(" · ") || "Sin detalles"}
-                          </p>
-                          <span className={`mt-2.5 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold ${m.chip}`}>
-                            <span className={`w-1.5 h-1.5 rounded-full ${m.dot}`} />
-                            {m.label}
-                          </span>
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-                {visibleCount < filtered.length && (
-                  <div ref={sentinelRef} className="mt-8 flex justify-center">
-                    <div className="flex items-center gap-2 text-sm text-gray-400">
-                      <span className="w-4 h-4 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
-                      Cargando más registros…
+                            <div className="p-4">
+                              <h3 className="font-semibold text-[15px] leading-snug">{p.nombre} {p.apellido}</h3>
+                              <p className="text-xs text-gray-500 mt-1 line-clamp-2">
+                                {[p.edad_aproximada ? `${p.edad_aproximada} años` : null, p.ultimo_lugar_visto]
+                                  .filter(Boolean)
+                                  .join(" · ") || "Sin detalles"}
+                              </p>
+                              <span className={`mt-2.5 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold ${m.chip}`}>
+                                <span className={`w-1.5 h-1.5 rounded-full ${m.dot}`} />
+                                {m.label}
+                              </span>
+                            </div>
+                          </button>
+                        );
+                      })}
                     </div>
-                  </div>
-                )}
-              </>
-            )}
+                    {totalPages > 1 && (
+                      <div className="mt-10 flex flex-wrap items-center justify-center gap-2">
+                        <button
+                          onClick={() => goTo(page - 1)}
+                          disabled={page === 0}
+                          className="px-3 py-2 rounded-lg border border-border text-sm font-medium text-gray-600 hover:bg-muted disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                        >
+                          ← Anterior
+                        </button>
+                        {Array.from({ length: totalPages }).map((_, i) => (
+                          <button
+                            key={i}
+                            onClick={() => goTo(i)}
+                            className={`w-9 h-9 rounded-lg text-sm font-semibold transition-colors ${
+                              i === page
+                                ? "bg-primary text-white"
+                                : "border border-border text-gray-600 hover:bg-muted"
+                            }`}
+                          >
+                            {i + 1}
+                          </button>
+                        ))}
+                        <button
+                          onClick={() => goTo(page + 1)}
+                          disabled={page === totalPages - 1}
+                          className="px-3 py-2 rounded-lg border border-border text-sm font-medium text-gray-600 hover:bg-muted disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                        >
+                          Siguiente →
+                        </button>
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
           </div>
         </section>
 
