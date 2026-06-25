@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useToast } from "@/components/toast-provider";
+import { DocumentPicker, uploadVictimDocuments } from "@/components/victim-documents";
 import {
   generoUiToDb,
   getClientOrganizationId,
@@ -54,6 +55,7 @@ export function TabFicha() {
   const toast = useToast();
   const [triaje, setTriaje] = useState<TriageUiId>("verde");
   const [loading, setLoading] = useState(false);
+  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
 
   const triajeColors: Record<TriageUiId, string> = {
     verde:    "border-triage-green text-triage-green bg-green-50",
@@ -134,8 +136,24 @@ export function TabFicha() {
       }
 
       const categoria = triageUiToDb(triaje);
+      const victimId = victimJson.data.id as string;
+
+      if (pendingFiles.length > 0) {
+        const { uploaded, errors } = await uploadVictimDocuments(
+          victimId,
+          organization_id,
+          pendingFiles,
+        );
+        if (errors.length > 0) {
+          toast.error(`Algunos archivos no se subieron: ${errors.join("; ")}`);
+        } else if (uploaded > 0) {
+          toast.success(`${uploaded} documento${uploaded > 1 ? "s" : ""} adjunto${uploaded > 1 ? "s" : ""}`);
+        }
+      }
+
       form.reset();
       setTriaje("verde");
+      setPendingFiles([]);
       window.dispatchEvent(new CustomEvent(TRIAGE_UPDATED_EVENT));
       toast.success(
         `Paciente registrado (${categoria}). Ya aparece en el tablero de Triaje.`,
@@ -286,6 +304,12 @@ export function TabFicha() {
               {DESTINOS.map((d) => <option key={d} value={d}>{d}</option>)}
             </select>
           </Field>
+        </section>
+
+        {/* 4. Documentos */}
+        <section className="bg-muted rounded-lg border border-border p-4 space-y-4">
+          <SectionHeader number="4" title="Documentos e Imágenes" />
+          <DocumentPicker files={pendingFiles} onChange={setPendingFiles} />
         </section>
 
         <button

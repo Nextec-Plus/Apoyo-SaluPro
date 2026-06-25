@@ -34,3 +34,14 @@ const GENERO_UI_TO_DB: Record<string, 'M' | 'F' | 'Otro'> = {
 export function generoUiToDb(label: string) {
   return GENERO_UI_TO_DB[label] ?? null
 }
+
+const GENERO_DB_TO_UI: Record<string, string> = {
+  M: 'Masculino',
+  F: 'Femenino',
+  Otro: 'Otro',
+}
+
+export function generoDbToUi(code: string | null | undefined) {
+  if (!code) return '—'
+  return GENERO_DB_TO_UI[code] ?? code
+}
