@@ -6,6 +6,8 @@ import type { ReportesSummary } from "@/lib/reportes/summary";
 import { useToast } from "@/components/toast-provider";
 
 type ExportType = "resumen" | "pacientes" | "desaparecidos" | "encontrados" | "fallecidos";
+type ExportFormat = "csv" | "pdf";
+type ExportKey = `${ExportType}:${ExportFormat}`;
 
 function StatCard({
   value,
@@ -59,32 +61,46 @@ function TriageBar({
   );
 }
 
-function ExportButton({
+function ExportCard({
   label,
   description,
-  onClick,
-  loading,
+  onCsv,
+  onPdf,
+  loadingCsv,
+  loadingPdf,
   accent,
 }: {
   label: string;
   description: string;
-  onClick: () => void;
-  loading: boolean;
+  onCsv: () => void;
+  onPdf: () => void;
+  loadingCsv: boolean;
+  loadingPdf: boolean;
   accent: string;
 }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={loading}
-      className={`flex flex-col items-start gap-1 rounded-xl border border-border bg-white px-4 py-3.5 text-left shadow-sm transition-colors hover:bg-muted/50 disabled:opacity-60 ${accent}`}
-    >
-      <span className="text-sm font-semibold text-gray-800 flex items-center gap-2">
-        <span aria-hidden>⬇</span>
-        {label}
-      </span>
-      <span className="text-xs text-gray-500">{description}</span>
-    </button>
+    <div className={`rounded-xl border border-border bg-white px-4 py-3.5 shadow-sm ${accent}`}>
+      <p className="text-sm font-semibold text-gray-800">{label}</p>
+      <p className="text-xs text-gray-500 mt-0.5 mb-3">{description}</p>
+      <div className="flex gap-2">
+        <button
+          type="button"
+          onClick={onCsv}
+          disabled={loadingCsv || loadingPdf}
+          className="flex-1 text-xs font-semibold rounded-lg border border-border px-2.5 py-2 hover:bg-muted/60 transition-colors disabled:opacity-50"
+        >
+          {loadingCsv ? "…" : "CSV"}
+        </button>
+        <button
+          type="button"
+          onClick={onPdf}
+          disabled={loadingCsv || loadingPdf}
+          className="flex-1 text-xs font-semibold rounded-lg border border-primary/30 text-primary px-2.5 py-2 hover:bg-primary-light transition-colors disabled:opacity-50"
+        >
+          {loadingPdf ? "…" : "PDF"}
+        </button>
+      </div>
+    </div>
   );
 }
 
@@ -93,7 +109,7 @@ export function TabReportes() {
   const orgId = getClientOrganizationId();
   const [summary, setSummary] = useState<ReportesSummary | null>(null);
   const [loading, setLoading] = useState(true);
-  const [exporting, setExporting] = useState<ExportType | null>(null);
+  const [exporting, setExporting] = useState<ExportKey | null>(null);
 
   const loadSummary = useCallback(async () => {
     setLoading(true);
@@ -112,11 +128,12 @@ export function TabReportes() {
     loadSummary();
   }, [loadSummary]);
 
-  const download = async (type: ExportType) => {
-    setExporting(type);
+  const download = async (type: ExportType, format: ExportFormat) => {
+    const key: ExportKey = `${type}:${format}`;
+    setExporting(key);
     try {
       const res = await fetch(
-        `/api/reportes/export?type=${type}&organization_id=${orgId}`,
+        `/api/reportes/export?type=${type}&format=${format}&organization_id=${orgId}`,
       );
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
@@ -125,7 +142,7 @@ export function TabReportes() {
       const blob = await res.blob();
       const disposition = res.headers.get("Content-Disposition") ?? "";
       const match = disposition.match(/filename="([^"]+)"/);
-      const filename = match?.[1] ?? `reporte-${type}.csv`;
+      const filename = match?.[1] ?? `reporte-${type}.${format}`;
 
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -155,7 +172,7 @@ export function TabReportes() {
             <div>
               <h2 className="text-lg font-bold text-gray-800">Reportes y Exportación</h2>
               <p className="text-xs text-gray-500 mt-0.5">
-                Resumen operativo de pacientes y personas desaparecidas. Descarga los datos en CSV.
+                Resumen operativo de pacientes y personas desaparecidas. Descarga en CSV o PDF.
               </p>
             </div>
             <button
@@ -278,45 +295,55 @@ export function TabReportes() {
 
       {/* Exportaciones */}
       <div className="bg-white rounded-xl shadow-sm border border-border p-6">
-        <h3 className="text-sm font-bold text-gray-800 mb-1">Descargar datos (CSV)</h3>
+        <h3 className="text-sm font-bold text-gray-800 mb-1">Descargar datos</h3>
         <p className="text-xs text-gray-500 mb-4">
-          Los archivos incluyen BOM UTF-8 para abrir correctamente en Excel.
+          CSV para Excel · PDF para impresión y archivo oficial.
         </p>
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
-          <ExportButton
+          <ExportCard
             label="Resumen general"
             description="Totales y contadores agregados"
-            onClick={() => download("resumen")}
-            loading={exporting === "resumen"}
-            accent="hover:border-primary/40"
+            onCsv={() => download("resumen", "csv")}
+            onPdf={() => download("resumen", "pdf")}
+            loadingCsv={exporting === "resumen:csv"}
+            loadingPdf={exporting === "resumen:pdf"}
+            accent=""
           />
-          <ExportButton
+          <ExportCard
             label="Lista de pacientes"
-            description="Todos los damnificados con ficha clínica"
-            onClick={() => download("pacientes")}
-            loading={exporting === "pacientes"}
-            accent="hover:border-primary/40"
+            description="Damnificados con ficha clínica"
+            onCsv={() => download("pacientes", "csv")}
+            onPdf={() => download("pacientes", "pdf")}
+            loadingCsv={exporting === "pacientes:csv"}
+            loadingPdf={exporting === "pacientes:pdf"}
+            accent=""
           />
-          <ExportButton
+          <ExportCard
             label="Desaparecidos"
             description="Personas con estado Desaparecido"
-            onClick={() => download("desaparecidos")}
-            loading={exporting === "desaparecidos"}
-            accent="hover:border-crisis/30"
+            onCsv={() => download("desaparecidos", "csv")}
+            onPdf={() => download("desaparecidos", "pdf")}
+            loadingCsv={exporting === "desaparecidos:csv"}
+            loadingPdf={exporting === "desaparecidos:pdf"}
+            accent=""
           />
-          <ExportButton
+          <ExportCard
             label="Encontrados"
             description="Personas localizadas con vida"
-            onClick={() => download("encontrados")}
-            loading={exporting === "encontrados"}
-            accent="hover:border-triage-green/40"
+            onCsv={() => download("encontrados", "csv")}
+            onPdf={() => download("encontrados", "pdf")}
+            loadingCsv={exporting === "encontrados:csv"}
+            loadingPdf={exporting === "encontrados:pdf"}
+            accent=""
           />
-          <ExportButton
+          <ExportCard
             label="Fallecidos"
             description="Confirmados fallecidos"
-            onClick={() => download("fallecidos")}
-            loading={exporting === "fallecidos"}
-            accent="hover:border-gray-300"
+            onCsv={() => download("fallecidos", "csv")}
+            onPdf={() => download("fallecidos", "pdf")}
+            loadingCsv={exporting === "fallecidos:csv"}
+            loadingPdf={exporting === "fallecidos:pdf"}
+            accent=""
           />
         </div>
       </div>

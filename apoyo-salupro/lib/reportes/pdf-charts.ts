@@ -1,0 +1,131 @@
+import type { jsPDF } from "jspdf";
+
+export type BarItem = {
+  label: string;
+  value: number;
+  color: [number, number, number];
+};
+
+/** Barras horizontales con etiqueta y valor. */
+export function drawHorizontalBarChart(
+  doc: jsPDF,
+  opts: {
+    x: number;
+    y: number;
+    width: number;
+    title: string;
+    items: BarItem[];
+  },
+): number {
+  const { x, y, width, title, items } = opts;
+  const labelW = 42;
+  const valueW = 14;
+  const barAreaW = width - labelW - valueW - 4;
+  const barH = 7;
+  const gap = 3;
+  const max = Math.max(...items.map((i) => i.value), 1);
+
+  doc.setFontSize(10);
+  doc.setTextColor(31, 41, 55);
+  doc.setFont("helvetica", "bold");
+  doc.text(title, x, y);
+  doc.setFont("helvetica", "normal");
+
+  let cy = y + 6;
+  for (const item of items) {
+    doc.setFontSize(8);
+    doc.setTextColor(75, 85, 99);
+    doc.text(item.label, x, cy + 5);
+
+    const barX = x + labelW;
+    const barLen = barAreaW * (item.value / max);
+    doc.setFillColor(...item.color);
+    if (barLen > 0) {
+      doc.roundedRect(barX, cy, barLen, barH, 1, 1, "F");
+    }
+
+    doc.setTextColor(31, 41, 55);
+    doc.setFont("helvetica", "bold");
+    doc.text(item.value.toLocaleString("es-VE"), barX + barAreaW + 2, cy + 5);
+    doc.setFont("helvetica", "normal");
+
+    cy += barH + gap;
+  }
+
+  return cy + 4;
+}
+
+/** Fila de KPIs (número grande + etiqueta). */
+export function drawKpiRow(
+  doc: jsPDF,
+  opts: {
+    x: number;
+    y: number;
+    width: number;
+    items: { label: string; value: number; color?: [number, number, number] }[];
+  },
+): number {
+  const { x, y, width, items } = opts;
+  const colW = width / items.length;
+
+  items.forEach((item, i) => {
+    const cx = x + i * colW + colW / 2;
+    if (item.color) doc.setTextColor(...item.color);
+    else doc.setTextColor(31, 41, 55);
+    doc.setFontSize(16);
+    doc.setFont("helvetica", "bold");
+    doc.text(item.value.toLocaleString("es-VE"), cx, y + 6, { align: "center" });
+    doc.setFontSize(7);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(107, 114, 128);
+    doc.text(item.label.toUpperCase(), cx, y + 12, { align: "center" });
+  });
+
+  return y + 18;
+}
+
+export type LegendItem = {
+  color: [number, number, number];
+  label: string;
+  description: string;
+};
+
+/** Leyenda de colores (cuadrado + texto). */
+export function drawColorLegend(
+  doc: jsPDF,
+  opts: {
+    x: number;
+    y: number;
+    width: number;
+    title: string;
+    items: LegendItem[];
+  },
+): number {
+  const { x, y, width, title, items } = opts;
+  const box = 4;
+
+  doc.setFontSize(8);
+  doc.setTextColor(75, 85, 99);
+  doc.setFont("helvetica", "bold");
+  doc.text(title, x, y);
+  doc.setFont("helvetica", "normal");
+
+  let cy = y + 5;
+  for (const item of items) {
+    doc.setFillColor(...item.color);
+    doc.roundedRect(x, cy - 3, box, box, 0.5, 0.5, "F");
+    doc.setFontSize(7.5);
+    doc.setTextColor(31, 41, 55);
+    doc.setFont("helvetica", "bold");
+    doc.text(item.label, x + box + 2, cy);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(107, 114, 128);
+    const descX = x + box + 2 + doc.getTextWidth(item.label) + 2;
+    const maxW = width - (descX - x);
+    const lines = doc.splitTextToSize(item.description, maxW);
+    doc.text(lines, descX, cy);
+    cy += Math.max(5, lines.length * 3.5);
+  }
+
+  return cy + 2;
+}
