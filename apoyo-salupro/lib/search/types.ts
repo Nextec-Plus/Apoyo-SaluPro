@@ -122,6 +122,8 @@ export type MissingPersonSearchItem = {
   ultimo_lugar_visto: string | null
   informacion_adicional: string | null
   estado: import("@/lib/types/database").MissingPersonStatus
+  motivo_fallecimiento: string | null
+  fallecimiento_confirmado: boolean
   contacto_nombre: string
   contacto_apellido: string
   contacto_correo: string | null

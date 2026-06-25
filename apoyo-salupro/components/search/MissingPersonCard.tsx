@@ -24,7 +24,10 @@ function Icon({ path, className = "" }: { path: string; className?: string }) {
 const USER_ICON = "M20 21a8 8 0 0 0-16 0M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z"
 
 function chunkExtras(p: MissingPersonSearchItem) {
-  return [p.edad_aproximada ? `${p.edad_aproximada} años` : null, p.ultimo_lugar_visto]
+  // Para fallecidos el detalle relevante es el motivo, no el último lugar visto.
+  const detalle =
+    p.estado === "Confirmado Fallecido" ? p.motivo_fallecimiento : p.ultimo_lugar_visto
+  return [p.edad_aproximada ? `${p.edad_aproximada} años` : null, detalle]
     .filter(Boolean)
     .join(" · ") || "Sin detalles"
 }

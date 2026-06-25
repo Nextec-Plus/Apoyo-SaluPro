@@ -40,16 +40,17 @@ function Field({ label, required, children }: { label: string; required?: boolea
 
 /* ── Tarjetas de estadísticas (datos reales del endpoint /stats) ─────────── */
 
-type Stats = { total: number; busquedas: number; encontradas: number };
+type Stats = { total: number; busquedas: number; encontradas: number; fallecidas: number };
 
 function StatCards({ stats, loading }: { stats: Stats; loading: boolean }) {
   const cards = [
     { v: stats.total, label: "Personas registradas", color: "text-gray-900", ring: "border-border" },
     { v: stats.busquedas, label: "Aún buscadas", color: "text-crisis", ring: "border-crisis/20" },
     { v: stats.encontradas, label: "Encontradas", color: "text-triage-green", ring: "border-triage-green/25" },
+    { v: stats.fallecidas, label: "Fallecidas", color: "text-gray-600", ring: "border-gray-300" },
   ];
   return (
-    <div className="grid grid-cols-3 gap-2.5 sm:gap-3 mb-5">
+    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3 mb-5">
       {cards.map((c) => (
         <div key={c.label} className={`rounded-xl border bg-white px-3 py-3 sm:px-4 sm:py-3.5 shadow-sm ${c.ring}`}>
           <div className={`font-display text-xl sm:text-3xl font-extrabold tabular-nums ${c.color}`}>
@@ -111,13 +112,16 @@ function RegistrosList({ reloadToken }: { reloadToken: number }) {
   );
 }
 
+type RegistroTipo = "desaparecida" | "fallecida";
+
 export function TabDesaparecidos() {
   const toast = useToast();
   const [view, setView] = useState<"reportar" | "registros">("reportar");
+  const [tipo, setTipo] = useState<RegistroTipo>("desaparecida");
   const [reloadToken, setReloadToken] = useState(0);
 
   /* ── Estadísticas globales ─────────────────────────────────────────── */
-  const [stats, setStats] = useState<Stats>({ total: 0, busquedas: 0, encontradas: 0 });
+  const [stats, setStats] = useState<Stats>({ total: 0, busquedas: 0, encontradas: 0, fallecidas: 0 });
   const [statsLoading, setStatsLoading] = useState(true);
 
   useEffect(() => {
@@ -152,6 +156,7 @@ export function TabDesaparecidos() {
     formRef.current?.reset();
     setPreview(null);
     setFormError("");
+    setTipo("desaparecida");
   };
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -169,10 +174,14 @@ export function TabDesaparecidos() {
       return v ? Number(v) : null;
     };
 
+    const esFallecida = tipo === "fallecida";
+
     const nombre = (fd.get("nombre") as string)?.trim();
     const apellido = (fd.get("apellido") as string)?.trim();
     if (!nombre || !apellido) {
-      const msg = "El nombre y el apellido de la persona desaparecida son obligatorios.";
+      const msg = esFallecida
+        ? "El nombre y el apellido de la persona fallecida son obligatorios."
+        : "El nombre y el apellido de la persona desaparecida son obligatorios.";
       setFormError(msg);
       toast.error(msg);
       setSubmitting(false);
@@ -185,7 +194,10 @@ export function TabDesaparecidos() {
       cedula: str("cedula"),
       edad_aproximada: num("edad_aproximada"),
       genero: str("genero"),
-      ultimo_lugar_visto: str("ultimo_lugar_visto"),
+      // Según el tipo: lugar visto (desaparecida) o motivo (fallecida, opcional).
+      ultimo_lugar_visto: esFallecida ? null : str("ultimo_lugar_visto"),
+      motivo_fallecimiento: esFallecida ? str("motivo_fallecimiento") : null,
+      estado: esFallecida ? "Confirmado Fallecido" : "Desaparecido",
       informacion_adicional: str("informacion_adicional"),
       // Contacto (familiar) — todos opcionales. Un único nombre y teléfono.
       contacto_nombre: str("contacto_nombre") ?? "",
@@ -202,7 +214,10 @@ export function TabDesaparecidos() {
         body: JSON.stringify(body),
       });
       const json = await res.json();
-      if (!res.ok || json.error) throw new Error(json.error || "No se pudo emitir la alerta");
+      if (!res.ok || json.error)
+        throw new Error(
+          json.error || (esFallecida ? "No se pudo registrar el fallecimiento" : "No se pudo emitir la alerta"),
+        );
 
       const id: string = json.data.id;
 
@@ -222,7 +237,18 @@ export function TabDesaparecidos() {
         }
       }
 
-      toast.success("Alerta emitida — el reporte quedó registrado.");
+      // El backend avisa si la cédula ya estaba reportada como desaparecida:
+      // en ese caso se actualizó ese mismo registro a "Confirmado Fallecido".
+      const matched = json.matched_missing as { nombre: string; apellido: string } | null;
+      if (matched) {
+        toast.success(
+          `⚠️ ${matched.nombre} ${matched.apellido} estaba reportada como DESAPARECIDA. Su registro se actualizó a fallecida.`,
+        );
+      } else if (esFallecida) {
+        toast.success("Fallecimiento registrado correctamente.");
+      } else {
+        toast.success("Alerta emitida — el reporte quedó registrado.");
+      }
       resetForm();
       setReloadToken((t) => t + 1); // refresca stats + listado
       setView("registros");
@@ -269,10 +295,37 @@ export function TabDesaparecidos() {
 
       {view === "reportar" ? (
         <form ref={formRef} onSubmit={handleSubmit} className="space-y-6">
-          {/* 1. Persona desaparecida */}
+          {/* Tipo de registro: desaparecida o fallecida (solo interno) */}
+          <div className="grid grid-cols-2 gap-2 rounded-lg bg-muted p-1">
+            {([
+              { v: "desaparecida", label: "Persona desaparecida" },
+              { v: "fallecida", label: "Persona fallecida" },
+            ] as const).map((opt) => {
+              const active = tipo === opt.v;
+              const accent =
+                opt.v === "fallecida" ? "text-gray-800" : "text-primary";
+              return (
+                <button
+                  key={opt.v}
+                  type="button"
+                  onClick={() => setTipo(opt.v)}
+                  aria-pressed={active}
+                  className={`text-sm font-semibold px-3.5 py-2 rounded-md transition-colors ${
+                    active ? `bg-white shadow-sm ${accent}` : "text-gray-500 hover:text-gray-800"
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* 1. Datos de la persona */}
           <section className="bg-muted rounded-lg border border-border p-4 space-y-4">
             <h3 className="text-[11px] font-bold uppercase tracking-widest text-gray-400">
-              1. Datos de la persona desaparecida
+              {tipo === "fallecida"
+                ? "1. Datos de la persona fallecida"
+                : "1. Datos de la persona desaparecida"}
             </h3>
 
             <div className="flex flex-col sm:flex-row gap-5">
@@ -321,9 +374,19 @@ export function TabDesaparecidos() {
               </div>
             </div>
 
-            <Field label="Último lugar visto">
-              <input name="ultimo_lugar_visto" placeholder="Ej: Macuto, cerca del malecón" className={inputCls} />
-            </Field>
+            {tipo === "fallecida" ? (
+              <Field label="Motivo de fallecimiento (opcional)">
+                <input
+                  name="motivo_fallecimiento"
+                  placeholder="Ej: Causas naturales, accidente…"
+                  className={inputCls}
+                />
+              </Field>
+            ) : (
+              <Field label="Último lugar visto">
+                <input name="ultimo_lugar_visto" placeholder="Ej: Macuto, cerca del malecón" className={inputCls} />
+              </Field>
+            )}
             <Field label="Información adicional">
               <textarea
                 name="informacion_adicional"
@@ -368,7 +431,13 @@ export function TabDesaparecidos() {
             disabled={submitting}
             className="w-full bg-gray-800 hover:bg-gray-900 text-white font-bold py-3.5 rounded-lg shadow-sm transition-colors text-sm tracking-wide disabled:opacity-60 disabled:cursor-not-allowed"
           >
-            {submitting ? "EMITIENDO…" : "EMITIR ALERTA DE BÚSQUEDA"}
+            {submitting
+              ? tipo === "fallecida"
+                ? "REGISTRANDO…"
+                : "EMITIENDO…"
+              : tipo === "fallecida"
+                ? "REGISTRAR FALLECIMIENTO"
+                : "EMITIR ALERTA DE BÚSQUEDA"}
           </button>
         </form>
       ) : (

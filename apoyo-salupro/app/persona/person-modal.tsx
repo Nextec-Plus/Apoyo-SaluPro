@@ -30,6 +30,7 @@ export function PersonModal({
   onClose: () => void;
 }) {
   const m = STATUS_META[person.estado];
+  const esFallecido = person.estado === "Confirmado Fallecido";
   const images = person.missing_person_images ?? [];
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
 
@@ -114,9 +115,21 @@ export function PersonModal({
               {person.nombre} {person.apellido}
             </h2>
 
-            {person.ultimo_lugar_visto && (
-              <p className="mt-1 text-sm text-gray-600 leading-snug">
-                Visto por última vez en {person.ultimo_lugar_visto}
+            {esFallecido
+              ? person.motivo_fallecimiento && (
+                  <p className="mt-1 text-sm text-gray-600 leading-snug">
+                    Motivo de fallecimiento: {person.motivo_fallecimiento}
+                  </p>
+                )
+              : person.ultimo_lugar_visto && (
+                  <p className="mt-1 text-sm text-gray-600 leading-snug">
+                    Visto por última vez en {person.ultimo_lugar_visto}
+                  </p>
+                )}
+
+            {esFallecido && person.fallecimiento_confirmado && (
+              <p className="mt-1.5 text-xs font-medium text-crisis">
+                Estaba reportada como desaparecida; su fallecimiento fue confirmado.
               </p>
             )}
           </div>
@@ -127,7 +140,11 @@ export function PersonModal({
               <Field label="Cédula" value={person.cedula} />
               <Field label="Edad" value={person.edad_aproximada ? `${person.edad_aproximada} años` : null} />
               <Field label="Género" value={person.genero} />
-              <Field label="Último lugar" value={person.ultimo_lugar_visto} />
+              {esFallecido ? (
+                <Field label="Motivo de fallecimiento" value={person.motivo_fallecimiento} />
+              ) : (
+                <Field label="Último lugar" value={person.ultimo_lugar_visto} />
+              )}
             </dl>
             {person.informacion_adicional && (
               <p className="mt-3 pt-3 text-sm text-gray-700 leading-relaxed border-t border-border">

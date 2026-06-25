@@ -240,6 +240,8 @@ export type Database = {
           ultimo_lugar_visto: string | null
           informacion_adicional: string | null
           estado: Database["public"]["Enums"]["missing_person_status"]
+          motivo_fallecimiento: string | null
+          fallecimiento_confirmado: boolean
           contacto_nombre: string
           contacto_apellido: string
           contacto_correo: string | null
@@ -259,6 +261,8 @@ export type Database = {
           ultimo_lugar_visto?: string | null
           informacion_adicional?: string | null
           estado?: Database["public"]["Enums"]["missing_person_status"]
+          motivo_fallecimiento?: string | null
+          fallecimiento_confirmado?: boolean
           contacto_nombre: string
           contacto_apellido: string
           contacto_correo?: string | null
@@ -278,6 +282,8 @@ export type Database = {
           ultimo_lugar_visto?: string | null
           informacion_adicional?: string | null
           estado?: Database["public"]["Enums"]["missing_person_status"]
+          motivo_fallecimiento?: string | null
+          fallecimiento_confirmado?: boolean
           contacto_nombre?: string
           contacto_apellido?: string
           contacto_correo?: string | null

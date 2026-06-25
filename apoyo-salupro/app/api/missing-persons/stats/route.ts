@@ -14,7 +14,7 @@ import type { MissingPersonStatus } from '@/lib/types/database'
 export async function GET() {
   const supabase = await createServiceClient()
 
-  const [totalRes, busquedasRes, encontradasRes] = await Promise.all([
+  const [totalRes, busquedasRes, encontradasRes, fallecidasRes] = await Promise.all([
     supabase
       .from('missing_persons')
       .select('*', { count: 'exact', head: true }),
@@ -26,6 +26,10 @@ export async function GET() {
       .from('missing_persons')
       .select('*', { count: 'exact', head: true })
       .eq('estado', 'Encontrado' as MissingPersonStatus),
+    supabase
+      .from('missing_persons')
+      .select('*', { count: 'exact', head: true })
+      .eq('estado', 'Confirmado Fallecido' as MissingPersonStatus),
   ])
 
   if (totalRes.error) {
@@ -36,6 +40,7 @@ export async function GET() {
     total: totalRes.count ?? 0,
     busquedas: busquedasRes.count ?? 0,
     encontradas: encontradasRes.count ?? 0,
+    fallecidas: fallecidasRes.count ?? 0,
     error: null,
   })
   res.headers.set('Cache-Control', 'public, s-maxage=30, stale-while-revalidate=60')

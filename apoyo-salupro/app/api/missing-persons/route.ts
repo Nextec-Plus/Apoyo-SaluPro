@@ -43,7 +43,7 @@ export async function GET(request: NextRequest) {
 
   // Columnas ligeras compartidas por los modos paginados (1 imagen por persona).
   const LIST_COLUMNS =
-    'id, organization_id, nombre, apellido, cedula, edad_aproximada, genero, ultimo_lugar_visto, informacion_adicional, estado, contacto_nombre, contacto_apellido, contacto_correo, contacto_telefono_nacional, contacto_telefono_internacional, created_at, updated_at, missing_person_images!missing_person_images_missing_person_id_fkey(storage_path)'
+    'id, organization_id, nombre, apellido, cedula, edad_aproximada, genero, ultimo_lugar_visto, informacion_adicional, estado, motivo_fallecimiento, fallecimiento_confirmado, contacto_nombre, contacto_apellido, contacto_correo, contacto_telefono_nacional, contacto_telefono_internacional, created_at, updated_at, missing_person_images!missing_person_images_missing_person_id_fkey(storage_path)'
 
   // Aplica los filtros comunes (search/estado/cedula/organization) a un query.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- builder de PostgREST
@@ -194,12 +194,68 @@ export async function POST(request: NextRequest) {
 
   // Los datos de contacto son opcionales. Las columnas contacto_nombre/apellido son
   // NOT NULL en la base de datos, así que normalizamos los ausentes a cadena vacía.
+  // `fallecimiento_confirmado` lo controla el servidor (no se confía en el cliente):
+  // solo se marca TRUE cuando se confirma una desaparición previa más abajo.
+  const cedula = body.cedula?.trim() || null
   const insert: InsertMissingPerson = {
     ...body,
     nombre,
     apellido,
+    cedula,
     contacto_nombre: body.contacto_nombre?.trim() || '',
     contacto_apellido: body.contacto_apellido?.trim() || '',
+    fallecimiento_confirmado: false,
+  }
+
+  // ── Confirmación de fallecimiento sobre una desaparición previa ───────────
+  // Si se registra una persona como fallecida (estado 'Confirmado Fallecido') y
+  // su cédula ya estaba reportada como Desaparecida/Avistada, NO se duplica:
+  // se actualiza ese registro a fallecido y se avisa al cliente con
+  // `matched_missing` para que muestre la alerta correspondiente.
+  if (insert.estado === 'Confirmado Fallecido' && cedula) {
+    const { data: existing, error: lookupError } = await supabase
+      .from('missing_persons')
+      .select('id, nombre, apellido')
+      .eq('cedula', cedula)
+      .in('estado', ['Desaparecido', 'Avistado'])
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    if (lookupError) {
+      return Response.json({ data: null, error: lookupError.message }, { status: 500 })
+    }
+
+    if (existing) {
+      const { data: updated, error: updateError } = await supabase
+        .from('missing_persons')
+        .update({
+          estado: 'Confirmado Fallecido',
+          motivo_fallecimiento: insert.motivo_fallecimiento ?? null,
+          informacion_adicional: insert.informacion_adicional ?? undefined,
+          fallecimiento_confirmado: true,
+        })
+        .eq('id', existing.id)
+        .select()
+        .single()
+
+      if (updateError) {
+        return Response.json({ data: null, error: updateError.message }, { status: 500 })
+      }
+
+      return Response.json(
+        {
+          data: updated,
+          matched_missing: {
+            id: existing.id,
+            nombre: existing.nombre,
+            apellido: existing.apellido,
+          },
+          error: null,
+        },
+        { status: 200 },
+      )
+    }
   }
 
   const { data, error } = await supabase
@@ -209,5 +265,5 @@ export async function POST(request: NextRequest) {
     .single()
 
   if (error) return Response.json({ data: null, error: error.message }, { status: 500 })
-  return Response.json({ data, error: null }, { status: 201 })
+  return Response.json({ data, matched_missing: null, error: null }, { status: 201 })
 }
