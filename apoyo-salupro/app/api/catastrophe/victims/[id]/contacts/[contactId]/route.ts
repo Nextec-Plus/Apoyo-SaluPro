@@ -20,8 +20,7 @@ export async function PATCH(
   if (body.is_emergency_contact) {
     await supabase
       .from('catastrophe_family_contacts')
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      .update({ is_emergency_contact: false } as any)
+      .update({ is_emergency_contact: false })
       .eq('victim_id', id)
       .eq('is_emergency_contact', true)
       .neq('id', contactId)
@@ -29,8 +28,7 @@ export async function PATCH(
 
   const { data, error } = await supabase
     .from('catastrophe_family_contacts')
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    .update(body as any)
+    .update(body)
     .eq('id', contactId)
     .eq('victim_id', id)
     .select()

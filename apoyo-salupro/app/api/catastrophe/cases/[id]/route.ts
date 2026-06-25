@@ -47,8 +47,7 @@ export async function PATCH(
 
   const { data, error } = await supabase
     .from('catastrophe_victim_info')
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    .update(body as any)
+    .update(body)
     .eq('id', id)
     .select('*, catastrophe_victims(*)')
     .single()

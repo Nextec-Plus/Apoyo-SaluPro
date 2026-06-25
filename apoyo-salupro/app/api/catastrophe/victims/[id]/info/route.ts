@@ -46,8 +46,7 @@ export async function POST(
 
   const { data, error } = await supabase
     .from('catastrophe_victim_info')
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    .upsert({ ...body, victim_id: id } as any, { onConflict: 'victim_id' })
+    .upsert({ ...body, victim_id: id }, { onConflict: 'victim_id' })
     .select()
     .single()
 
@@ -71,8 +70,7 @@ export async function PATCH(
 
   const { data, error } = await supabase
     .from('catastrophe_victim_info')
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    .update(body as any)
+    .update(body)
     .eq('victim_id', id)
     .select()
     .single()

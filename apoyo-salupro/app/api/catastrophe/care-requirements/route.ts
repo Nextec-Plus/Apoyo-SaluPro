@@ -55,8 +55,7 @@ export async function POST(request: NextRequest) {
 
   const { data, error } = await supabase
     .from('catastrophe_care_requirements')
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    .insert(body as any)
+    .insert(body)
     .select()
     .single()
 

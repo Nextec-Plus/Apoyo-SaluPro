@@ -62,7 +62,6 @@ export async function POST(request: NextRequest) {
 
   const { data, error } = await supabase
     .from('catastrophe_victim_info')
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     .insert({
       organization_id: body.organization_id,
       victim_id: body.victim_id,
@@ -73,7 +72,7 @@ export async function POST(request: NextRequest) {
       tratamiento_medicamentos: body.tratamiento_medicamentos ?? null,
       estado_destino: 'Triaje',
       fecha_hora_entrada: new Date().toISOString(),
-    } as any)
+    })
     .select('*, catastrophe_victims(*)')
     .single()
 

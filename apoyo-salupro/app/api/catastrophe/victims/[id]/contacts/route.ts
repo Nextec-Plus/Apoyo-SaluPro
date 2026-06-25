@@ -45,16 +45,14 @@ export async function POST(
   if (body.is_emergency_contact) {
     await supabase
       .from('catastrophe_family_contacts')
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      .update({ is_emergency_contact: false } as any)
+      .update({ is_emergency_contact: false })
       .eq('victim_id', id)
       .eq('is_emergency_contact', true)
   }
 
   const { data, error } = await supabase
     .from('catastrophe_family_contacts')
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    .insert({ ...body, victim_id: id } as any)
+    .insert({ ...body, victim_id: id })
     .select()
     .single()
 

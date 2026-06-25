@@ -27,11 +27,10 @@ export async function createClient() {
   )
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export async function createServiceClient(): Promise<ReturnType<typeof createServerClient<any>>> {
+export async function createServiceClient() {
   const cookieStore = await cookies()
 
-  return createServerClient(
+  return createServerClient<Database>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
     {
