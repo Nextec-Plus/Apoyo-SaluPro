@@ -43,8 +43,8 @@ export function TabFicha() {
 
   const triajeColors: Record<string, string> = {
     verde:    "border-triage-green text-triage-green bg-green-50",
-    amarillo: "border-triage-yellow text-amber-700 bg-amber-50",
-    rojo:     "border-triage-red text-crisis bg-crisis-light",
+    amarillo: "border-triage-yellow text-triage-yellow bg-amber-50",
+    rojo:     "border-triage-red text-triage-red bg-red-50",
   };
 
   const handleSubmit = (e: React.FormEvent) => {
