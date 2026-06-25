@@ -5,6 +5,12 @@ import { VictimDocuments } from "@/components/victim-documents";
 import { useToast } from "@/components/toast-provider";
 import { generoDbToUi, generoUiToDb, getClientOrganizationId } from "@/lib/config";
 import { TRIAGE_UPDATED_EVENT } from "@/lib/events";
+import {
+  DESTINOS,
+  formatDestino,
+  isReferidoHospital,
+  parseDestino,
+} from "@/lib/catastrophe-destinos";
 import type {
   CatastropheFamilyContact,
   CatastropheVictim,
@@ -15,14 +21,6 @@ import type {
 const SECTORES = [
   "Maiquetía", "Caraballeda", "Macuto", "La Guaira",
   "Naiguatá", "Caruao", "Tanaguarena", "Otro",
-];
-
-const DESTINOS = [
-  "Dado de alta (Ambulatorio)",
-  "En observación en módulo móvil",
-  "Referido al Hospital José María Vargas",
-  "Referido al Hospital Periférico de Pariata",
-  "Trasladado a Refugio Oficial",
 ];
 
 const inputCls =
@@ -49,6 +47,7 @@ type PatientForm = {
   alergias: string;
   tratamiento_medicamentos: string;
   destino: string;
+  hospital_destino: string;
 };
 
 type ContactForm = {
@@ -76,6 +75,7 @@ function getInfo(victim: VictimDetail): CatastropheVictimInfo | null {
 }
 
 function victimToForm(victim: VictimDetail, info: CatastropheVictimInfo | null): PatientForm {
+  const { destino, hospital } = parseDestino(victim.notas);
   return {
     nombre_completo: victim.nombre_completo ?? "",
     cedula: victim.cedula ?? "",
@@ -91,7 +91,8 @@ function victimToForm(victim: VictimDetail, info: CatastropheVictimInfo | null):
     condiciones_preexistentes: info?.condiciones_preexistentes ?? "",
     alergias: info?.alergias ?? "",
     tratamiento_medicamentos: info?.tratamiento_medicamentos ?? "",
-    destino: victim.notas ?? DESTINOS[0],
+    destino,
+    hospital_destino: hospital,
   };
 }
 
@@ -245,7 +246,7 @@ export function PatientModal({
           nombre_edificio_casa: form.nombre_edificio_casa.trim() || null,
           numero_apartamento_casa: form.numero_apartamento_casa.trim() || null,
           ubicacion_actual_refugio: form.ubicacion_actual_refugio.trim() || null,
-          notas: form.destino || null,
+          notas: formatDestino(form.destino, form.hospital_destino) || null,
         }),
       });
       const victimJson = await victimRes.json();
@@ -597,10 +598,31 @@ export function PatientModal({
                         <input type="text" value={form.tratamiento_medicamentos} onChange={(e) => updateForm({ tratamiento_medicamentos: e.target.value })} className={inputCls} />
                       </Field>
                       <Field label="Destino del paciente">
-                        <select value={form.destino} onChange={(e) => updateForm({ destino: e.target.value })} className={inputCls}>
+                        <select
+                          value={form.destino}
+                          onChange={(e) => {
+                            const destino = e.target.value;
+                            updateForm({
+                              destino,
+                              hospital_destino: isReferidoHospital(destino) ? form.hospital_destino : "",
+                            });
+                          }}
+                          className={inputCls}
+                        >
                           {DESTINOS.map((d) => <option key={d} value={d}>{d}</option>)}
                         </select>
                       </Field>
+                      {isReferidoHospital(form.destino) && (
+                        <Field label="Hospital / Clínica de destino">
+                          <input
+                            type="text"
+                            value={form.hospital_destino}
+                            onChange={(e) => updateForm({ hospital_destino: e.target.value })}
+                            className={inputCls}
+                            placeholder="Ej: Hospital José María Vargas, Clínica…"
+                          />
+                        </Field>
+                      )}
                     </div>
                   </div>
                 ) : (

@@ -10,18 +10,15 @@ import {
   type TriageUiId,
 } from "@/lib/config";
 import { TRIAGE_UPDATED_EVENT } from "@/lib/events";
+import {
+  DESTINOS,
+  formatDestino,
+  isReferidoHospital,
+} from "@/lib/catastrophe-destinos";
 
 const SECTORES = [
   "Maiquetía", "Caraballeda", "Macuto", "La Guaira",
   "Naiguatá", "Caruao", "Tanaguarena", "Otro",
-];
-
-const DESTINOS = [
-  "Dado de alta (Ambulatorio)",
-  "En observación en módulo móvil",
-  "Referido al Hospital José María Vargas",
-  "Referido al Hospital Periférico de Pariata",
-  "Trasladado a Refugio Oficial",
 ];
 
 function SectionHeader({ number, title }: { number: string; title: string }) {
@@ -56,6 +53,8 @@ export function TabFicha() {
   const [triaje, setTriaje] = useState<TriageUiId>("verde");
   const [loading, setLoading] = useState(false);
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
+  const [destino, setDestino] = useState<string>(DESTINOS[0]);
+  const [hospitalDestino, setHospitalDestino] = useState("");
 
   const triajeColors: Record<TriageUiId, string> = {
     verde:    "border-triage-green text-triage-green bg-green-50",
@@ -93,7 +92,7 @@ export function TabFicha() {
           nombre_edificio_casa: str(fd, "edificio"),
           numero_apartamento_casa: str(fd, "apto"),
           ubicacion_actual_refugio: str(fd, "ubicacion"),
-          notas: str(fd, "destino"),
+          notas: formatDestino(destino, hospitalDestino),
         }),
       });
       const victimJson = await victimRes.json();
@@ -153,6 +152,8 @@ export function TabFicha() {
 
       form.reset();
       setTriaje("verde");
+      setDestino(DESTINOS[0]);
+      setHospitalDestino("");
       setPendingFiles([]);
       window.dispatchEvent(new CustomEvent(TRIAGE_UPDATED_EVENT));
       toast.success(
@@ -300,10 +301,29 @@ export function TabFicha() {
           </div>
 
           <Field label="Estatus / Destino del Paciente">
-            <select name="destino" className={inputCls} defaultValue={DESTINOS[0]}>
+            <select
+              value={destino}
+              onChange={(e) => {
+                const next = e.target.value;
+                setDestino(next);
+                if (!isReferidoHospital(next)) setHospitalDestino("");
+              }}
+              className={inputCls}
+            >
               {DESTINOS.map((d) => <option key={d} value={d}>{d}</option>)}
             </select>
           </Field>
+          {isReferidoHospital(destino) && (
+            <Field label="Hospital / Clínica de destino">
+              <input
+                type="text"
+                value={hospitalDestino}
+                onChange={(e) => setHospitalDestino(e.target.value)}
+                className={inputCls}
+                placeholder="Ej: Hospital José María Vargas, Clínica…"
+              />
+            </Field>
+          )}
         </section>
 
         {/* 4. Documentos */}
