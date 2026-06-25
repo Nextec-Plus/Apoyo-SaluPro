@@ -59,6 +59,7 @@ export async function POST(request: NextRequest, ctx: Ctx) {
   const update: UpdateMissingPerson = { estado: body.estado }
   if (body.ubicacion_avistamiento) update.ultimo_lugar_visto = body.ubicacion_avistamiento
   if (body.notas) update.informacion_adicional = body.notas
+  if (body.estado === 'Confirmado Fallecido') update.fallecimiento_confirmado = true
 
   const { data, error } = await supabase
     .from('missing_persons')
