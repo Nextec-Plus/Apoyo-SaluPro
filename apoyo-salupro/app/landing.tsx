@@ -166,6 +166,7 @@ export default function Landing() {
               Reportar persona
             </Link>
             {/* Login — botón al extremo derecho del header */}
+            {/*
             <Link
               href="/login"
               className="inline-flex items-center gap-1.5 rounded-lg border border-primary/30 px-4 py-2 text-sm font-semibold text-primary hover:bg-primary-light transition-colors"
@@ -173,6 +174,7 @@ export default function Landing() {
               <Icon path={I.login} className="w-4 h-4" />
               <span className="hidden sm:inline">Iniciar sesión</span>
             </Link>
+            */}
             <button
               onClick={() => setMenu((v) => !v)}
               className="lg:hidden p-2 -mr-2 text-gray-700"
@@ -537,7 +539,7 @@ export default function Landing() {
                 <li><a href="#buscar" className="hover:text-white transition-colors">Buscar personas</a></li>
                 <li><Link href="/reportar" className="hover:text-white transition-colors">Reportar desaparición</Link></li>
                 <li><a href="#alianza" className="hover:text-white transition-colors">Alianza La Vaca</a></li>
-                <li><Link href="/login" className="hover:text-white transition-colors">Iniciar sesión</Link></li>
+                {/*<li><Link href="/login" className="hover:text-white transition-colors">Iniciar sesión</Link></li>*/}
               </ul>
             </div>
 
