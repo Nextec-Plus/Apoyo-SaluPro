@@ -148,7 +148,7 @@ export const missingPersonsPagedConfig: SearchConfig<
 > = {
   entity: "missing_persons",
   endpoint: "/api/missing-persons",
-  pageSize: 9,
+  pageSize: 12,
   view: "grid",
   paginationMode: "pages",
   initialFilters: { estado: "todos" },

@@ -226,11 +226,13 @@ export function ResultsState({
 
 export function ResultsGrid({
   columns = "sm:grid-cols-2 lg:grid-cols-3",
+  gap = "gap-4 sm:gap-5",
   renderItem,
   skeleton,
   skeletonCount = 6,
 }: {
   columns?: string
+  gap?: string
   renderItem: (item: any, index: number) => ReactNode
   skeleton: ReactNode
   skeletonCount?: number
@@ -242,7 +244,7 @@ export function ResultsGrid({
 
   if (state.loadingInitial) {
     return (
-      <div className={`grid grid-cols-1 ${columns} gap-4 sm:gap-5`}>
+      <div className={`grid grid-cols-1 ${columns} ${gap}`}>
         {Array.from({ length: skeletonCount }).map((_, i) => (
           <div key={i}>{skeleton}</div>
         ))}
@@ -252,7 +254,7 @@ export function ResultsGrid({
 
   return (
     <>
-      <div className={`grid grid-cols-1 ${columns} gap-4 sm:gap-5`}>
+      <div className={`grid grid-cols-1 ${columns} ${gap}`}>
         {state.items.map((it, i) => renderItem(it, i))}
       </div>
 

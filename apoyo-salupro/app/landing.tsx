@@ -312,7 +312,7 @@ function CasosSection() {
 
   return (
     <section ref={casosRef} id="casos" className="bg-card border-b border-border scroll-mt-20">
-      <div className="mx-auto max-w-7xl px-4 py-16 sm:py-20">
+      <div className="mx-auto max-w-[1600px] px-2 sm:px-3 py-12 sm:py-16">
         <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mb-6">
           <div>
             <p className="text-xs font-bold uppercase tracking-widest text-primary mb-3">Registro central</p>
@@ -332,6 +332,7 @@ function CasosSection() {
         <div className="mt-4">
           <ResultsGrid
             columns="sm:grid-cols-2 lg:grid-cols-4"
+            gap="gap-2 sm:gap-3"
             skeleton={<MissingPersonCardSkeleton />}
             skeletonCount={8}
             renderItem={(p: MissingPersonSearchItem) => (

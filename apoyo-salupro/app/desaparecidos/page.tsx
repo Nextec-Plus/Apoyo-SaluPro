@@ -171,7 +171,7 @@ export default function DesaparecidosPage() {
 
           {/* Grid + filtros */}
           <section className="bg-card">
-            <div className="mx-auto max-w-7xl px-4 py-12 sm:py-16">
+            <div className="mx-auto max-w-[1600px] px-2 sm:px-3 py-10 sm:py-14">
               <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
                 <ResultCount
                   loadingLabel="Cargando…"
@@ -191,6 +191,7 @@ export default function DesaparecidosPage() {
               <div className="mt-4">
                 <ResultsGrid
                   columns="sm:grid-cols-2 lg:grid-cols-4"
+                  gap="gap-2 sm:gap-3"
                   skeleton={<MissingPersonCardSkeleton />}
                   skeletonCount={8}
                   renderItem={(p: MissingPersonSearchItem) => (
