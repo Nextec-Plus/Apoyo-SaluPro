@@ -41,8 +41,11 @@ export async function PATCH(
   let body: UpdateCaseBody
   try {
     body = await request.json()
-  } catch {
-    return Response.json({ data: null, error: 'Body inválido' }, { status: 400 })
+  } catch (err) {
+    return Response.json(
+      { data: null, error: `JSON inválido: ${err instanceof Error ? err.message : String(err)}` },
+      { status: 400 },
+    )
   }
 
   const { data, error } = await supabase

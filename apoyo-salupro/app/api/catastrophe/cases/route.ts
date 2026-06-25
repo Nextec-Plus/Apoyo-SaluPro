@@ -23,7 +23,7 @@ export async function GET(request: NextRequest) {
   const fecha_fin = searchParams.get('fecha_fin')
 
   if (!organization_id) {
-    return Response.json({ data: null, error: 'organization_id requerido' }, { status: 400 })
+    return Response.json({ data: null, error: 'organization_id es requerido' }, { status: 400 })
   }
 
   let query = supabase
@@ -49,15 +49,21 @@ export async function POST(request: NextRequest) {
   let body: CreateCaseBody
   try {
     body = await request.json()
-  } catch {
-    return Response.json({ data: null, error: 'Body inválido' }, { status: 400 })
-  }
-
-  if (!body.organization_id || !body.victim_id || !body.triage_category) {
+  } catch (err) {
     return Response.json(
-      { data: null, error: 'organization_id, victim_id y triage_category son requeridos' },
+      { data: null, error: `JSON inválido: ${err instanceof Error ? err.message : String(err)}` },
       { status: 400 },
     )
+  }
+
+  if (!body.organization_id) {
+    return Response.json({ data: null, error: 'organization_id es requerido' }, { status: 400 })
+  }
+  if (!body.victim_id) {
+    return Response.json({ data: null, error: 'victim_id es requerido' }, { status: 400 })
+  }
+  if (!body.triage_category) {
+    return Response.json({ data: null, error: 'triage_category es requerido' }, { status: 400 })
   }
 
   const { data, error } = await supabase

@@ -11,7 +11,7 @@ export async function GET(request: NextRequest) {
   const provider_id = searchParams.get('provider_id')
 
   if (!organization_id) {
-    return Response.json({ data: null, error: 'organization_id requerido' }, { status: 400 })
+    return Response.json({ data: null, error: 'organization_id es requerido' }, { status: 400 })
   }
 
   let query = supabase
@@ -42,15 +42,24 @@ export async function POST(request: NextRequest) {
   let body: InsertCatastropheCareRequirement
   try {
     body = await request.json()
-  } catch {
-    return Response.json({ data: null, error: 'Body inválido' }, { status: 400 })
-  }
-
-  if (!body.organization_id || !body.care_state || !body.field_name || !body.field_label) {
+  } catch (err) {
     return Response.json(
-      { data: null, error: 'organization_id, care_state, field_name y field_label son requeridos' },
+      { data: null, error: `JSON inválido: ${err instanceof Error ? err.message : String(err)}` },
       { status: 400 },
     )
+  }
+
+  if (!body.organization_id) {
+    return Response.json({ data: null, error: 'organization_id es requerido' }, { status: 400 })
+  }
+  if (!body.care_state) {
+    return Response.json({ data: null, error: 'care_state es requerido' }, { status: 400 })
+  }
+  if (!body.field_name) {
+    return Response.json({ data: null, error: 'field_name es requerido' }, { status: 400 })
+  }
+  if (!body.field_label) {
+    return Response.json({ data: null, error: 'field_label es requerido' }, { status: 400 })
   }
 
   const { data, error } = await supabase

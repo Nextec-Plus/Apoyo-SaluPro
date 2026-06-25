@@ -11,7 +11,7 @@ export async function GET(request: NextRequest) {
   const search = searchParams.get('search')
 
   if (!organization_id) {
-    return Response.json({ data: null, error: 'organization_id requerido' }, { status: 400 })
+    return Response.json({ data: null, error: 'organization_id es requerido' }, { status: 400 })
   }
 
   let query = supabase
@@ -35,15 +35,18 @@ export async function POST(request: NextRequest) {
   let body: InsertCatastropheVictim
   try {
     body = await request.json()
-  } catch {
-    return Response.json({ data: null, error: 'Body inválido' }, { status: 400 })
-  }
-
-  if (!body.organization_id || !body.nombre_completo) {
+  } catch (err) {
     return Response.json(
-      { data: null, error: 'organization_id y nombre_completo son requeridos' },
+      { data: null, error: `JSON inválido: ${err instanceof Error ? err.message : String(err)}` },
       { status: 400 },
     )
+  }
+
+  if (!body.organization_id) {
+    return Response.json({ data: null, error: 'organization_id es requerido' }, { status: 400 })
+  }
+  if (!body.nombre_completo) {
+    return Response.json({ data: null, error: 'nombre_completo es requerido' }, { status: 400 })
   }
 
   // Auto-generate registration_number: V-001, V-002, ...

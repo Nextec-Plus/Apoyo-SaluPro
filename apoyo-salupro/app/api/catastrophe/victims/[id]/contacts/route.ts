@@ -30,15 +30,21 @@ export async function POST(
   let body: Omit<InsertCatastropheFamilyContact, 'victim_id'>
   try {
     body = await request.json()
-  } catch {
-    return Response.json({ data: null, error: 'Body inválido' }, { status: 400 })
-  }
-
-  if (!body.nombre_contacto || !body.relacion || !body.organization_id) {
+  } catch (err) {
     return Response.json(
-      { data: null, error: 'nombre_contacto, relacion y organization_id son requeridos' },
+      { data: null, error: `JSON inválido: ${err instanceof Error ? err.message : String(err)}` },
       { status: 400 },
     )
+  }
+
+  if (!body.organization_id) {
+    return Response.json({ data: null, error: 'organization_id es requerido' }, { status: 400 })
+  }
+  if (!body.nombre_contacto) {
+    return Response.json({ data: null, error: 'nombre_contacto es requerido' }, { status: 400 })
+  }
+  if (!body.relacion) {
+    return Response.json({ data: null, error: 'relacion es requerida' }, { status: 400 })
   }
 
   // If this contact is emergency, clear existing emergency contact

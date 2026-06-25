@@ -33,15 +33,18 @@ export async function POST(
   let body: Omit<InsertCatastropheVictimInfo, 'victim_id'>
   try {
     body = await request.json()
-  } catch {
-    return Response.json({ data: null, error: 'Body inválido' }, { status: 400 })
-  }
-
-  if (!body.triage_category || !body.organization_id) {
+  } catch (err) {
     return Response.json(
-      { data: null, error: 'triage_category y organization_id son requeridos' },
+      { data: null, error: `JSON inválido: ${err instanceof Error ? err.message : String(err)}` },
       { status: 400 },
     )
+  }
+
+  if (!body.organization_id) {
+    return Response.json({ data: null, error: 'organization_id es requerido' }, { status: 400 })
+  }
+  if (!body.triage_category) {
+    return Response.json({ data: null, error: 'triage_category es requerido' }, { status: 400 })
   }
 
   const { data, error } = await supabase
@@ -64,8 +67,11 @@ export async function PATCH(
   let body: UpdateCatastropheVictimInfo
   try {
     body = await request.json()
-  } catch {
-    return Response.json({ data: null, error: 'Body inválido' }, { status: 400 })
+  } catch (err) {
+    return Response.json(
+      { data: null, error: `JSON inválido: ${err instanceof Error ? err.message : String(err)}` },
+      { status: 400 },
+    )
   }
 
   const { data, error } = await supabase

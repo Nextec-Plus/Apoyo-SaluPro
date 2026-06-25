@@ -12,8 +12,11 @@ export async function PATCH(
   let body: UpdateCatastropheFamilyContact
   try {
     body = await request.json()
-  } catch {
-    return Response.json({ data: null, error: 'Body inválido' }, { status: 400 })
+  } catch (err) {
+    return Response.json(
+      { data: null, error: `JSON inválido: ${err instanceof Error ? err.message : String(err)}` },
+      { status: 400 },
+    )
   }
 
   // If setting as emergency contact, clear the previous one
