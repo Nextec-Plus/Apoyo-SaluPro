@@ -331,7 +331,7 @@ function CasosSection() {
 
         <div className="mt-4">
           <ResultsGrid
-            columns="sm:grid-cols-2 lg:grid-cols-3"
+            columns="sm:grid-cols-2 lg:grid-cols-4"
             skeleton={<MissingPersonCardSkeleton />}
             skeletonCount={8}
             renderItem={(p: MissingPersonSearchItem) => (
