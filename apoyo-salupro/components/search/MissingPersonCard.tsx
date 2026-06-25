@@ -52,7 +52,7 @@ export function MissingPersonCard({
   const hover = accent === "crisis" ? "hover:border-crisis/40 hover:shadow-crisis/10" : "hover:border-primary/40 hover:shadow-primary/10"
   const placeholder = accent === "crisis" ? "text-crisis/30" : "text-primary/40"
   const bgPlaceholder = accent === "crisis" ? "bg-crisis/5" : "bg-primary-light"
-  const imgCls = imageHeight ?? "aspect-[4/3]"
+  const imgCls = imageHeight ?? "aspect-[3/4]"
 
   const agePart = p.edad_aproximada ? `${p.edad_aproximada} años` : null
   const generoPart = formatGenero(p.genero)
@@ -133,7 +133,7 @@ export function MissingPersonCardSkeleton({
 }: {
   imageHeight?: string
 }) {
-  const imgCls = imageHeight ?? "aspect-[4/3]"
+  const imgCls = imageHeight ?? "aspect-[3/4]"
   return (
     <div className="rounded-2xl border border-border bg-muted/50 animate-pulse overflow-hidden">
       <div className={`${imgCls} bg-muted`} />
