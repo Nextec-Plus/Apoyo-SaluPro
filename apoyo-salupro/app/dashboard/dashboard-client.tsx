@@ -47,7 +47,7 @@ export function DashboardClient() {
                 Apoyo SaluPro
               </p>
               <p className="text-[11px] text-gray-500 leading-tight truncate">
-                Control de Crisis · La Guaira
+                Control de Crisis · Venezuela
               </p>
             </div>
           </div>
@@ -109,7 +109,7 @@ export function DashboardClient() {
 
       {/* ── Footer ────────────────────────────────────────────────────── */}
       <footer className="bg-gray-800 text-gray-400 text-center py-3 text-xs border-t border-gray-700">
-        <p>Sistema Local Descentralizado · Apoyo SaluPro · Emergencias La Guaira 2026</p>
+        <p>Sistema Descentralizado · Apoyo SaluPro · Registro de Personas Desaparecidas · Venezuela 2026</p>
         <p className="text-gray-500 mt-0.5">
           Datos guardados localmente para funcionamiento sin conexión estable.
         </p>
