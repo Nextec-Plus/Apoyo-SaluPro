@@ -11,26 +11,87 @@ export type FoundMatchResult = {
   created: boolean
 }
 
-/** Normaliza cédula venezolana para comparación (sin prefijo V/E, espacios ni guiones). */
+/**
+ * Normaliza cédula venezolana para comparación.
+ * Acepta equivalentes: v-100000, V-10000, 10.000.000, 10000, V 10.000.000, E-12345678.
+ * Resultado: solo dígitos, sin ceros a la izquierda.
+ */
 export function normalizeCedula(cedula: string | null | undefined): string | null {
   if (!cedula?.trim()) return null
-  const digits = cedula.replace(/[\s.\-]/g, '').replace(/^[vVeE]/, '')
-  return digits || null
+  const digits = cedula.replace(/\D/g, '')
+  if (!digits) return null
+  return digits.replace(/^0+/, '') || '0'
 }
 
-/** Normaliza nombre para comparación exacta (minúsculas, sin acentos, espacios colapsados). */
+/**
+ * Normaliza nombre para comparación exacta.
+ * Ignora mayúsculas/minúsculas, acentos, puntuación y espacios extra.
+ */
 export function normalizeName(name: string | null | undefined): string | null {
   if (!name?.trim()) return null
   return name
     .normalize('NFD')
     .replace(/\p{M}/gu, '')
     .toLowerCase()
+    .replace(/[.,'"()-]/g, ' ')
     .trim()
     .replace(/\s+/g, ' ')
 }
 
 export function missingPersonFullName(person: { nombre: string; apellido: string }): string {
   return `${person.nombre} ${person.apellido}`.trim()
+}
+
+/** Palabras normalizadas de un nombre (sin vacíos). */
+export function nameToWords(name: string | null | undefined): string[] {
+  const norm = normalizeName(name)
+  if (!norm) return []
+  return norm.split(' ').filter(Boolean)
+}
+
+/** Mismo conjunto de palabras, sin importar el orden ni repeticiones. */
+export function wordsSameSet(a: string[], b: string[]): boolean {
+  if (a.length !== b.length || a.length === 0) return false
+  const count = (words: string[]) => {
+    const map = new Map<string, number>()
+    for (const w of words) map.set(w, (map.get(w) ?? 0) + 1)
+    return map
+  }
+  const left = count(a)
+  const right = count(b)
+  if (left.size !== right.size) return false
+  for (const [word, n] of left) {
+    if (right.get(word) !== n) return false
+  }
+  return true
+}
+
+/**
+ * Coincidencia flexible de nombres:
+ * 1. Mismas palabras en cualquier orden (ej. "Pérez Juan" ↔ "Juan Pérez")
+ * 2. Primer nombre + primer apellido presentes en la ficha (ej. "González María" ↔ nombre María, apellido González)
+ */
+export function namesMatchFlexible(
+  victimFullName: string,
+  nombre: string,
+  apellido: string,
+): boolean {
+  const victimWords = nameToWords(victimFullName)
+  if (victimWords.length === 0) return false
+
+  const victimSet = new Set(victimWords)
+  const personWords = nameToWords(missingPersonFullName({ nombre, apellido }))
+  if (personWords.length === 0) return false
+
+  if (wordsSameSet(victimWords, personWords)) return true
+
+  const primerNombre = nameToWords(nombre)[0]
+  const primerApellido = nameToWords(apellido)[0]
+  if (primerNombre && primerApellido) {
+    return victimSet.has(primerNombre) && victimSet.has(primerApellido)
+  }
+
+  return false
 }
 
 /**
@@ -71,8 +132,7 @@ export async function syncMissingPersonMatches(
     }
 
     if (!matchType && normName) {
-      const personName = normalizeName(missingPersonFullName(person))
-      if (personName && personName === normName) {
+      if (namesMatchFlexible(victim.nombre_completo, person.nombre, person.apellido)) {
         matchType = 'nombre'
       }
     }
