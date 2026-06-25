@@ -562,7 +562,7 @@ function SiteFooter() {
             <span className="text-gray-500">Desarrollado por</span>
             <Image src="/nextec.svg" alt="nextec" width={20} height={20} className="h-5 w-5 transition-transform group-hover:rotate-90" />
             <span className="font-semibold text-gray-200 group-hover:text-white transition-colors tracking-wide lowercase">
-              nexte<sup className="text-[0.6em] font-bold align-super -mr-px">+</sup>c
+              nextec
             </span>
           </a>
         </div>
