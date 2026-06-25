@@ -9,6 +9,7 @@ import {
   firstImageUrl,
   STATUS_META,
 } from "@/lib/missing-persons";
+import { PersonModal } from "@/app/persona/person-modal";
 
 /* ── Contador animado ───────────────────────────────────────────────────── */
 
@@ -95,6 +96,7 @@ export default function Landing() {
   const [persons, setPersons] = useState<MissingPersonWithImages[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
+  const [selected, setSelected] = useState<MissingPersonWithImages | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -358,7 +360,13 @@ export default function Landing() {
             {loading ? (
               <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
                 {Array.from({ length: 6 }).map((_, i) => (
-                  <div key={i} className="h-28 rounded-2xl border border-border bg-muted/50 animate-pulse" />
+                  <div key={i} className="rounded-2xl border border-border bg-muted/50 animate-pulse overflow-hidden">
+                    <div className="h-[200px] bg-muted" />
+                    <div className="p-4 space-y-2">
+                      <div className="h-4 w-2/3 bg-muted rounded" />
+                      <div className="h-3 w-1/2 bg-muted rounded" />
+                    </div>
+                  </div>
                 ))}
               </div>
             ) : loadError ? (
@@ -386,31 +394,40 @@ export default function Landing() {
                   const m = STATUS_META[p.estado];
                   const img = firstImageUrl(p);
                   return (
-                    <Link
+                    <button
                       key={p.id}
-                      href={`/persona/${p.id}`}
-                      className="flex items-center gap-4 rounded-2xl bg-card border border-border p-4 hover:border-primary/40 hover:shadow-lg hover:shadow-primary/5 transition-all"
+                      type="button"
+                      onClick={() => setSelected(p)}
+                      className="group flex flex-col rounded-2xl bg-card border border-border overflow-hidden text-left hover:border-primary/40 hover:shadow-lg hover:shadow-primary/5 transition-all"
                     >
-                      <div className="shrink-0 w-16 h-16 rounded-xl bg-primary-light overflow-hidden flex items-center justify-center text-primary/40">
+                      <div className="relative w-full h-[300px] shrink-0 bg-primary-light overflow-hidden">
                         {img ? (
-                          <Image src={img} alt={p.nombre} width={64} height={64} className="w-full h-full object-cover" />
+                          <Image
+                            src={img}
+                            alt={`${p.nombre} ${p.apellido}`}
+                            fill
+                            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                            className="object-cover object-center group-hover:scale-[1.02] transition-transform duration-300"
+                          />
                         ) : (
-                          <Icon path={I.user} className="w-8 h-8" />
+                          <div className="absolute inset-0 flex items-center justify-center text-primary/40">
+                            <Icon path={I.user} className="w-12 h-12" />
+                          </div>
                         )}
                       </div>
-                      <div className="min-w-0 flex-1">
-                        <h3 className="font-semibold text-[15px] truncate">{p.nombre} {p.apellido}</h3>
-                        <p className="text-xs text-gray-500 mt-0.5 truncate">
+                      <div className="p-4">
+                        <h3 className="font-semibold text-[15px] leading-snug">{p.nombre} {p.apellido}</h3>
+                        <p className="text-xs text-gray-500 mt-1 line-clamp-2">
                           {[p.edad_aproximada ? `${p.edad_aproximada} años` : null, p.ultimo_lugar_visto]
                             .filter(Boolean)
                             .join(" · ") || "Sin detalles"}
                         </p>
-                        <span className={`mt-2 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold ${m.chip}`}>
+                        <span className={`mt-2.5 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold ${m.chip}`}>
                           <span className={`w-1.5 h-1.5 rounded-full ${m.dot}`} />
                           {m.label}
                         </span>
                       </div>
-                    </Link>
+                    </button>
                   );
                 })}
               </div>
@@ -571,6 +588,8 @@ export default function Landing() {
           </div>
         </div>
       </footer>
+
+      {selected && <PersonModal person={selected} onClose={() => setSelected(null)} />}
     </div>
   );
 }
