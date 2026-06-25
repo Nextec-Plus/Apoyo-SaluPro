@@ -8,7 +8,6 @@ import {
   useMemo,
   useRef,
   useState,
-  useDeferredValue,
   type ReactNode,
 } from "react"
 import type {
@@ -60,10 +59,21 @@ export function SearchProvider<
   children: ReactNode
 }) {
   const mode = config.paginationMode ?? "infinite"
+  const debounceMs = config.searchDebounceMs ?? 250
 
   const [rawSearch, setRawSearch] = useState(initialSearch)
-  // useDeferredValue: el input sigue siendo responsivo aunque el fetch sea lento.
-  const search = useDeferredValue(rawSearch)
+  // `rawSearch` controla el input (responsivo); `search` es el valor debounced
+  // que realmente dispara el fetch → 1 petición por pausa, no por pulsación.
+  // Antes se usaba useDeferredValue, que NO es un debounce: difiere el render
+  // pero igual lanzaba un fetch en cada tecla (caro con miles de usuarios).
+  const [search, setSearch] = useState(initialSearch)
+
+  useEffect(() => {
+    if (search === rawSearch) return
+    const id = setTimeout(() => setSearch(rawSearch), debounceMs)
+    return () => clearTimeout(id)
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `search` sólo se lee para cortar el timer redundante
+  }, [rawSearch, debounceMs])
 
   const [items, setItems] = useState<TItem[]>([])
   const [nextCursor, setNextCursor] = useState<string | null>(null)

@@ -1,6 +1,10 @@
 import type { NextRequest } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { getOrganizationId } from '@/lib/config'
+import {
+  applyMissingPersonSearch,
+  hasSearchIndex,
+} from '@/lib/missing-persons-search'
 import type {
   InsertMissingPerson,
   MissingPersonStatus,
@@ -45,18 +49,20 @@ export async function GET(request: NextRequest) {
   const LIST_COLUMNS =
     'id, organization_id, nombre, apellido, cedula, edad_aproximada, genero, ultimo_lugar_visto, informacion_adicional, estado, motivo_fallecimiento, fallecimiento_confirmado, contacto_nombre, contacto_apellido, contacto_correo, contacto_telefono_nacional, contacto_telefono_internacional, created_at, updated_at, missing_person_images!missing_person_images_missing_person_id_fkey(storage_path)'
 
+  // ¿Está disponible la columna acento-insensible `search_index` (migración 006)?
+  // Sólo se comprueba cuando hay término de búsqueda libre.
+  const useIndex = search ? await hasSearchIndex(supabase) : false
+
   // Aplica los filtros comunes (search/estado/cedula/organization) a un query.
+  // La búsqueda de texto se delega al núcleo compartido: tokeniza por palabras,
+  // sanea contra inyección de PostgREST y usa search_index cuando existe.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- builder de PostgREST
   const applyFilters = (q: any): any => {
     let query = q
     if (organization_id) query = query.eq('organization_id', organization_id)
     if (estado) query = query.eq('estado', estado)
     if (cedula) query = query.eq('cedula', cedula)
-    if (search) {
-      query = query.or(
-        `nombre.ilike.%${search}%,apellido.ilike.%${search}%,cedula.ilike.%${search}%`,
-      )
-    }
+    if (search) query = applyMissingPersonSearch(query, search, useIndex)
     return query
   }
 
