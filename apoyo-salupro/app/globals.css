@@ -29,9 +29,11 @@
   --radius-sm:              0.5rem;
   --radius-lg:              1rem;
 
-  /* Tipografía */
-  --font-sans:    var(--font-body);
-  --font-display: var(--font-display);
+  /* Tipografía — tokens Tailwind enlazados a next/font en <html> */
+  --font-sans: var(--font-family-body), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-family-display), var(--font-family-body), ui-sans-serif, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
+    "Courier New", monospace;
 }
 
 :root {
@@ -42,14 +44,18 @@
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-body), system-ui, -apple-system, BlinkMacSystemFont,
-    'Segoe UI', sans-serif;
+  font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
+h1,
+h2 {
+  font-family: var(--font-display);
+}
+
 .font-display {
-  font-family: var(--font-display), var(--font-body), sans-serif;
+  font-family: var(--font-display);
 }
 
 /* Entrada del hero */

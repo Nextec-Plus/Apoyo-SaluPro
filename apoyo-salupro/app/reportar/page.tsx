@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useToast } from "@/components/toast-provider";
 import type { InsertMissingPerson } from "@/lib/types/database";
 
 const inputCls =
@@ -12,6 +13,7 @@ const labelCls = "block text-sm font-semibold text-gray-700 mb-1.5";
 
 export default function ReportarPage() {
   const router = useRouter();
+  const toast = useToast();
   const fileRef = useRef<HTMLInputElement>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -54,7 +56,7 @@ export default function ReportarPage() {
     };
 
     if (!body.contacto_telefono_nacional && !body.contacto_telefono_internacional) {
-      setError("Indica al menos un teléfono de contacto (nacional o internacional).");
+      toast.error("Indica al menos un teléfono de contacto (nacional o internacional).");
       setLoading(false);
       return;
     }
@@ -87,8 +89,11 @@ export default function ReportarPage() {
       }
 
       setDoneId(id);
+      toast.success("Reporte registrado correctamente");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Error inesperado");
+      const msg = err instanceof Error ? err.message : "Error inesperado";
+      setError(msg);
+      toast.error(msg);
     } finally {
       setLoading(false);
     }
