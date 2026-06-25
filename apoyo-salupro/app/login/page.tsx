@@ -5,8 +5,8 @@ import { useRouter } from "next/navigation";
 import Image from "next/image";
 
 export default function LoginPage() {
-  const [email, setEmail]       = useState("");
-  const [password, setPassword] = useState("");
+  const [email, setEmail]       = useState("admin");
+  const [password, setPassword] = useState("admin");
   const [loading, setLoading]   = useState(false);
   const [error, setError]       = useState("");
   const router = useRouter();
@@ -70,7 +70,7 @@ export default function LoginPage() {
                 type="email"
                 required
                 autoComplete="email"
-                placeholder="operador@apoyosalupro.com"
+                placeholder="admin@demo.local"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="w-full rounded-lg border border-border px-3 py-3 text-sm text-gray-900 placeholder-gray-400
