@@ -8,9 +8,10 @@ import { TabDesaparecidos } from "./tabs/tab-desaparecidos";
 import { TabEncontrados }  from "./tabs/tab-encontrados";
 import { TabTriaje }       from "./tabs/tab-triaje";
 import { TabPacientes }    from "./tabs/tab-pacientes";
+import { TabReportes }     from "./tabs/tab-reportes";
 import { PatientModal }    from "./patient-modal";
 
-type Tab = "ficha" | "pacientes" | "desaparecidos" | "encontrados" | "triaje";
+type Tab = "ficha" | "pacientes" | "desaparecidos" | "encontrados" | "triaje" | "reportes";
 
 const TABS: { id: Tab; label: string; icon: string }[] = [
   { id: "ficha",         label: "Ficha Médica",           icon: "📋" },
@@ -18,6 +19,7 @@ const TABS: { id: Tab; label: string; icon: string }[] = [
   { id: "desaparecidos", label: "Personas Desaparecidas", icon: "🔍" },
   { id: "encontrados",   label: "Encontrados",            icon: "✅" },
   { id: "triaje",        label: "Triaje",                 icon: "🏥" },
+  { id: "reportes",      label: "Reportes",               icon: "📊" },
 ];
 
 export function DashboardClient() {
@@ -26,7 +28,7 @@ export function DashboardClient() {
   const initialTab = searchParams.get("tab");
   const pacienteParam = searchParams.get("paciente");
   const [activeTab, setActiveTab] = useState<Tab>(
-    initialTab === "pacientes" || initialTab === "desaparecidos" || initialTab === "encontrados" || initialTab === "triaje"
+    initialTab === "pacientes" || initialTab === "desaparecidos" || initialTab === "encontrados" || initialTab === "triaje" || initialTab === "reportes"
       ? initialTab
       : "ficha",
   );
@@ -165,6 +167,7 @@ export function DashboardClient() {
           <TabEncontrados onOpenPatient={openPatient} />
         )}
         {activeTab === "triaje"        && <TabTriaje />}
+        {activeTab === "reportes"      && <TabReportes />}
       </main>
 
       {selectedPatientId && (
