@@ -166,6 +166,7 @@ export function PatientModal({
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState<PatientForm | null>(null);
+  const [sendingSaluPro, setSendingSaluPro] = useState(false);
 
   const [showAddContact, setShowAddContact] = useState(false);
   const [newContact, setNewContact] = useState<ContactForm>(emptyContactForm);
@@ -224,6 +225,20 @@ export function PatientModal({
   const cancelEditing = () => {
     setEditing(false);
     setForm(null);
+  };
+
+  const sendToSaluPro = async () => {
+    setSendingSaluPro(true);
+    try {
+      const res = await fetch(`/api/catastrophe/victims/${victimId}/send-to-salupro`, { method: "POST" });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? "Error al enviar a SaluPro");
+      toast.success("Consulta enviada a SaluPro correctamente");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Error al enviar a SaluPro");
+    } finally {
+      setSendingSaluPro(false);
+    }
   };
 
   const updateForm = (patch: Partial<PatientForm>) => {
@@ -510,13 +525,24 @@ export function PatientModal({
               </button>
             )}
             {victim && !editing && !loading && (
-              <button
-                type="button"
-                onClick={startEditing}
-                className="text-xs font-semibold text-primary border border-primary/30 rounded-lg px-3 py-2 bg-primary/5 hover:text-primary-dark transition-colors"
-              >
-                Editar ficha
-              </button>
+              <>
+                <button
+                  type="button"
+                  onClick={sendToSaluPro}
+                  disabled={sendingSaluPro || !victim.cedula}
+                  title={!victim.cedula ? "Se requiere cédula para enviar a SaluPro" : "Enviar consulta a SaluPro"}
+                  className="text-xs font-semibold text-white bg-teal-600 hover:bg-teal-700 border border-teal-700 rounded-lg px-3 py-2 disabled:opacity-60 transition-colors"
+                >
+                  {sendingSaluPro ? "Enviando…" : "Enviar a SaluPro"}
+                </button>
+                <button
+                  type="button"
+                  onClick={startEditing}
+                  className="text-xs font-semibold text-primary border border-primary/30 rounded-lg px-3 py-2 bg-primary/5 hover:text-primary-dark transition-colors"
+                >
+                  Editar ficha
+                </button>
+              </>
             )}
             <button
               type="button"
