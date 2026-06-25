@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import type { MissingPersonStatus } from "@/lib/types/database";
@@ -10,6 +10,8 @@ import {
   STATUS_META,
 } from "@/lib/missing-persons";
 import { PersonModal } from "@/app/persona/person-modal";
+
+const PAGE_SIZE = 12;
 
 /* ── Contador animado ───────────────────────────────────────────────────── */
 
@@ -97,6 +99,8 @@ export default function Landing() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [selected, setSelected] = useState<MissingPersonWithImages | null>(null);
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  const sentinelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     let active = true;
@@ -113,6 +117,25 @@ export default function Landing() {
       active = false;
     };
   }, []);
+
+  useEffect(() => {
+    setVisibleCount(PAGE_SIZE);
+  }, [q, estado, tab]);
+
+  const loadMore = useCallback(() => {
+    setVisibleCount((c) => c + PAGE_SIZE);
+  }, []);
+
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el) return;
+    const io = new IntersectionObserver(
+      (entries) => { if (entries[0].isIntersecting) loadMore(); },
+      { rootMargin: "200px" },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [loadMore]);
 
   const stats = useMemo(() => {
     const total = persons.length;
@@ -154,12 +177,19 @@ export default function Landing() {
 
           <nav className="hidden lg:flex items-center gap-7 text-sm font-medium text-gray-600 ml-2">
             <a href="#buscar" className="hover:text-primary transition-colors">Buscar</a>
-            <a href="#como" className="hover:text-primary transition-colors">Cómo funciona</a>
             <a href="#casos" className="hover:text-primary transition-colors">Registros</a>
+            <a href="#como" className="hover:text-primary transition-colors">Cómo funciona</a>
             <a href="#alianza" className="hover:text-primary transition-colors">Alianza</a>
           </nav>
 
           <div className="ml-auto flex items-center gap-2.5">
+            <Link
+              href="/desaparecidos"
+              className="hidden sm:inline-flex items-center gap-1.5 rounded-lg border border-crisis/30 text-crisis hover:bg-crisis/5 px-4 py-2 text-sm font-semibold transition-colors"
+            >
+              <Icon path={I.search} className="w-4 h-4" />
+              Desaparecidos
+            </Link>
             <Link
               href="/reportar"
               className="hidden sm:inline-flex items-center gap-1.5 rounded-lg bg-crisis hover:bg-crisis-dark text-white px-4 py-2 text-sm font-semibold transition-colors"
@@ -192,15 +222,18 @@ export default function Landing() {
           <nav className="lg:hidden border-t border-border bg-card px-4 py-3 flex flex-col gap-1 text-sm font-medium text-gray-700">
             {[
               ["Buscar", "#buscar"],
-              ["Cómo funciona", "#como"],
               ["Registros", "#casos"],
+              ["Cómo funciona", "#como"],
               ["Alianza", "#alianza"],
             ].map(([label, href]) => (
               <a key={href} href={href} onClick={() => setMenu(false)} className="py-2 hover:text-primary">
                 {label}
               </a>
             ))}
-            <Link href="/reportar" className="mt-1 py-2 font-semibold text-crisis">
+            <Link href="/desaparecidos" onClick={() => setMenu(false)} className="mt-1 py-2 font-semibold text-crisis">
+              Personas desaparecidas
+            </Link>
+            <Link href="/reportar" onClick={() => setMenu(false)} className="py-2 font-semibold text-crisis">
               + Reportar persona
             </Link>
           </nav>
@@ -285,7 +318,7 @@ export default function Landing() {
 
         {/* ── Contadores (datos reales) ───────────────────────────────── */}
         <section className="border-b border-border bg-card">
-          <div className="mx-auto max-w-3xl px-4 py-10 grid grid-cols-3 gap-4 text-center">
+          <div className="mx-auto max-w-3xl px-4 py-10 grid grid-cols-3 gap-2 sm:gap-4 text-center">
             {[
               { v: stats.total, label: "Personas registradas", color: "text-gray-900" },
               { v: stats.buscadas, label: "Aún buscadas", color: "text-crisis" },
@@ -303,62 +336,38 @@ export default function Landing() {
           </div>
         </section>
 
-        {/* ── Cómo funciona ───────────────────────────────────────────── */}
-        <section id="como" className="bg-muted/50 border-b border-border">
-          <div className="mx-auto max-w-7xl px-4 py-16 sm:py-20">
-            <div className="max-w-2xl">
-              <p className="text-xs font-bold uppercase tracking-widest text-primary mb-3">Cómo funciona</p>
-              <h2 className="font-display text-3xl sm:text-4xl font-bold tracking-tight">
-                Tres pasos para reencontrar a quien buscas
-              </h2>
-            </div>
-
-            <div className="mt-12 grid md:grid-cols-3 gap-6">
-              {[
-                { icon: I.search, n: "01", t: "Busca", d: "Consulta el registro central por nombre, apellido o cédula. Actualizado por los equipos en campo." },
-                { icon: I.report, n: "02", t: "Reporta", d: "¿No aparece? Reporta la desaparición con su foto y datos de contacto para activar la búsqueda." },
-                { icon: I.heart, n: "03", t: "Conecta", d: "Quien tenga información usa los datos de contacto del reporte para coordinar la reunificación." },
-              ].map((step) => (
-                <div key={step.n} className="relative rounded-2xl bg-card border border-border p-7 hover:border-primary/40 hover:shadow-lg hover:shadow-primary/5 transition-all">
-                  <span className="absolute top-6 right-7 font-display text-4xl font-extrabold text-primary-light select-none">
-                    {step.n}
-                  </span>
-                  <div className="w-12 h-12 rounded-xl bg-primary-light flex items-center justify-center text-primary mb-5">
-                    <Icon path={step.icon} className="w-6 h-6" />
-                  </div>
-                  <h3 className="font-display text-xl font-bold mb-2">{step.t}</h3>
-                  <p className="text-sm text-gray-600 leading-relaxed">{step.d}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
-
         {/* ── Registros (datos reales) ────────────────────────────────── */}
         <section id="casos" className="bg-card border-b border-border scroll-mt-20">
           <div className="mx-auto max-w-7xl px-4 py-16 sm:py-20">
-            <div className="flex flex-wrap items-end justify-between gap-4 mb-8">
+            <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mb-8">
               <div>
                 <p className="text-xs font-bold uppercase tracking-widest text-primary mb-3">Registro central</p>
-                <h2 className="font-display text-3xl sm:text-4xl font-bold tracking-tight">Personas registradas</h2>
+                <h2 className="font-display text-2xl sm:text-3xl lg:text-4xl font-bold tracking-tight">Personas registradas</h2>
               </div>
-              <div className="flex items-center gap-3">
+              <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+                <Link
+                  href="/desaparecidos"
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-crisis/30 text-crisis hover:bg-crisis/5 px-3 py-2 text-xs sm:text-sm font-semibold transition-colors"
+                >
+                  <Icon path={I.search} className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                  Solo desaparecidos
+                </Link>
                 <select
                   value={estado}
                   onChange={(e) => setEstado(e.target.value as MissingPersonStatus | "todos")}
-                  className="rounded-lg border border-border bg-card px-3 py-2 text-sm font-medium text-gray-700 focus:outline-none focus:ring-2 focus:ring-primary-ring"
+                  className="rounded-lg border border-border bg-card px-3 py-2 text-xs sm:text-sm font-medium text-gray-700 focus:outline-none focus:ring-2 focus:ring-primary-ring"
                 >
                   <option value="todos">Todos los estados</option>
                   {ESTADOS.map((e) => (
                     <option key={e} value={e}>{STATUS_META[e].label}</option>
                   ))}
                 </select>
-                <span className="text-sm text-gray-400 whitespace-nowrap">{filtered.length} personas</span>
+                <span className="text-xs sm:text-sm text-gray-400 whitespace-nowrap">{filtered.length} personas</span>
               </div>
             </div>
 
             {loading ? (
-              <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
                 {Array.from({ length: 6 }).map((_, i) => (
                   <div key={i} className="rounded-2xl border border-border bg-muted/50 animate-pulse overflow-hidden">
                     <div className="h-[200px] bg-muted" />
@@ -389,49 +398,90 @@ export default function Landing() {
                 </Link>
               </div>
             ) : (
-              <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
-                {filtered.slice(0, 24).map((p) => {
-                  const m = STATUS_META[p.estado];
-                  const img = firstImageUrl(p);
-                  return (
-                    <button
-                      key={p.id}
-                      type="button"
-                      onClick={() => setSelected(p)}
-                      className="group flex flex-col rounded-2xl bg-card border border-border overflow-hidden text-left hover:border-primary/40 hover:shadow-lg hover:shadow-primary/5 transition-all"
-                    >
-                      <div className="relative w-full h-[300px] shrink-0 bg-primary-light overflow-hidden">
-                        {img ? (
-                          <Image
-                            src={img}
-                            alt={`${p.nombre} ${p.apellido}`}
-                            fill
-                            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-                            className="object-cover object-center group-hover:scale-[1.02] transition-transform duration-300"
-                          />
-                        ) : (
-                          <div className="absolute inset-0 flex items-center justify-center text-primary/40">
-                            <Icon path={I.user} className="w-12 h-12" />
-                          </div>
-                        )}
-                      </div>
-                      <div className="p-4">
-                        <h3 className="font-semibold text-[15px] leading-snug">{p.nombre} {p.apellido}</h3>
-                        <p className="text-xs text-gray-500 mt-1 line-clamp-2">
-                          {[p.edad_aproximada ? `${p.edad_aproximada} años` : null, p.ultimo_lugar_visto]
-                            .filter(Boolean)
-                            .join(" · ") || "Sin detalles"}
-                        </p>
-                        <span className={`mt-2.5 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold ${m.chip}`}>
-                          <span className={`w-1.5 h-1.5 rounded-full ${m.dot}`} />
-                          {m.label}
-                        </span>
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
+              <>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
+                  {filtered.slice(0, visibleCount).map((p) => {
+                    const m = STATUS_META[p.estado];
+                    const img = firstImageUrl(p);
+                    return (
+                      <button
+                        key={p.id}
+                        type="button"
+                        onClick={() => setSelected(p)}
+                        className="group flex flex-col rounded-2xl bg-card border border-border overflow-hidden text-left hover:border-primary/40 hover:shadow-lg hover:shadow-primary/5 transition-all"
+                      >
+                        <div className="relative w-full h-[300px] shrink-0 bg-primary-light overflow-hidden">
+                          {img ? (
+                            <Image
+                              src={img}
+                              alt={`${p.nombre} ${p.apellido}`}
+                              fill
+                              sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                              className="object-cover object-center group-hover:scale-[1.02] transition-transform duration-300"
+                            />
+                          ) : (
+                            <div className="absolute inset-0 flex items-center justify-center text-primary/40">
+                              <Icon path={I.user} className="w-12 h-12" />
+                            </div>
+                          )}
+                        </div>
+                        <div className="p-4">
+                          <h3 className="font-semibold text-[15px] leading-snug">{p.nombre} {p.apellido}</h3>
+                          <p className="text-xs text-gray-500 mt-1 line-clamp-2">
+                            {[p.edad_aproximada ? `${p.edad_aproximada} años` : null, p.ultimo_lugar_visto]
+                              .filter(Boolean)
+                              .join(" · ") || "Sin detalles"}
+                          </p>
+                          <span className={`mt-2.5 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold ${m.chip}`}>
+                            <span className={`w-1.5 h-1.5 rounded-full ${m.dot}`} />
+                            {m.label}
+                          </span>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+                {visibleCount < filtered.length && (
+                  <div ref={sentinelRef} className="mt-8 flex justify-center">
+                    <div className="flex items-center gap-2 text-sm text-gray-400">
+                      <span className="w-4 h-4 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+                      Cargando más registros…
+                    </div>
+                  </div>
+                )}
+              </>
             )}
+          </div>
+        </section>
+
+        {/* ── Cómo funciona ───────────────────────────────────────────── */}
+        <section id="como" className="bg-muted/50 border-b border-border">
+          <div className="mx-auto max-w-7xl px-4 py-16 sm:py-20">
+            <div className="max-w-2xl">
+              <p className="text-xs font-bold uppercase tracking-widest text-primary mb-3">Cómo funciona</p>
+              <h2 className="font-display text-3xl sm:text-4xl font-bold tracking-tight">
+                Tres pasos para reencontrar a quien buscas
+              </h2>
+            </div>
+
+            <div className="mt-10 sm:mt-12 grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
+              {[
+                { icon: I.search, n: "01", t: "Busca", d: "Consulta el registro central por nombre, apellido o cédula. Actualizado por los equipos en campo." },
+                { icon: I.report, n: "02", t: "Reporta", d: "¿No aparece? Reporta la desaparición con su foto y datos de contacto para activar la búsqueda." },
+                { icon: I.heart, n: "03", t: "Conecta", d: "Quien tenga información usa los datos de contacto del reporte para coordinar la reunificación." },
+              ].map((step) => (
+                <div key={step.n} className="relative rounded-2xl bg-card border border-border p-7 hover:border-primary/40 hover:shadow-lg hover:shadow-primary/5 transition-all">
+                  <span className="absolute top-6 right-7 font-display text-4xl font-extrabold text-primary-light select-none">
+                    {step.n}
+                  </span>
+                  <div className="w-12 h-12 rounded-xl bg-primary-light flex items-center justify-center text-primary mb-5">
+                    <Icon path={step.icon} className="w-6 h-6" />
+                  </div>
+                  <h3 className="font-display text-xl font-bold mb-2">{step.t}</h3>
+                  <p className="text-sm text-gray-600 leading-relaxed">{step.d}</p>
+                </div>
+              ))}
+            </div>
           </div>
         </section>
 
