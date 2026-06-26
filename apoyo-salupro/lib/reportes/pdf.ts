@@ -16,8 +16,8 @@ const GRAY: [number, number, number] = [107, 114, 128];
 
 const DESTINO_CHART_COLORS: Record<string, [number, number, number]> = {
   "Dado de alta (Ambulatorio)": GREEN,
-  "Referido al Hospital": RED,
-  "Trasladado a Refugio Oficial": BLUE,
+  "Referido al Hospital": BLUE,
+  "Trasladado a Refugio Oficial": YELLOW,
   [DESTINO_OTROS]: GRAY,
 };
 
@@ -174,6 +174,15 @@ function drawCohortPatientTable(
     styles: { fontSize: 7, cellPadding: 2, overflow: "linebreak" },
     headStyles: { fillColor: PRIMARY, textColor: 255, fontStyle: "bold" },
     margin: { left: margin, right: margin },
+    columnStyles: colorRows
+      ? undefined
+      : {
+          0: { cellWidth: 18 },
+          1: { cellWidth: 38 },
+          2: { cellWidth: 62 },
+          3: { cellWidth: 22 },
+          4: { cellWidth: 28 },
+        },
     didParseCell: (data) => {
       if (!colorRows || data.section !== "body") return;
       const triage = triages[data.row.index];

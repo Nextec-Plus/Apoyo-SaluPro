@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { DESTINOS_ALTA_TRASLADO } from "@/lib/catastrophe-destinos";
+import { DESTINOS_ALTA_TRASLADO, DESTINO_OTROS } from "@/lib/catastrophe-destinos";
 import { getClientOrganizationId } from "@/lib/config";
 import type { ReportesSummary } from "@/lib/reportes/summary-types";
 import { TRIAGE_LEVELS } from "@/lib/triage-levels";
@@ -234,13 +234,21 @@ export function TabReportes() {
           {/* Pacientes */}
           <section className="space-y-6">
             <h3 className="text-sm font-bold text-gray-800">Pacientes registrados</h3>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 max-w-md">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 max-w-lg">
               <StatCard
                 loading={loading}
                 value={summary?.pacientes.total ?? 0}
                 label="Total pacientes"
                 color="text-gray-900"
                 ring="border-border"
+              />
+              <StatCard
+                loading={loading}
+                value={summary?.pacientes.en_observacion.total ?? 0}
+                label="Triaje activo"
+                sub="En observación en módulo móvil"
+                color="text-primary"
+                ring="border-primary/25"
               />
             </div>
 
@@ -310,6 +318,16 @@ export function TabReportes() {
                     ring="border-border"
                   />
                 ))}
+                {!loading && (summary?.pacientes.dados_alta_traslado.por_destino[DESTINO_OTROS] ?? 0) > 0 && (
+                  <StatCard
+                    loading={loading}
+                    value={summary?.pacientes.dados_alta_traslado.por_destino[DESTINO_OTROS] ?? 0}
+                    label={DESTINO_OTROS}
+                    sub="Destinos no clasificados"
+                    color="text-gray-600"
+                    ring="border-gray-200"
+                  />
+                )}
               </div>
             </div>
           </section>

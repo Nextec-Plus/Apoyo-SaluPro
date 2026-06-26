@@ -1,11 +1,11 @@
 import {
   bucketDestinoAltaTraslado,
-  careStateToDestino,
   DESTINOS_ALTA_TRASLADO,
   DESTINO_OTROS,
-  isEnObservacionModulo,
+  isPacienteDadoDeAltaOTraslado,
   isPacienteEnObservacion,
-  parseDestino,
+  isEnObservacionModulo,
+  resolveDestinoPaciente,
 } from "@/lib/catastrophe-destinos";
 import { getOrganizationId } from "@/lib/config";
 import { scopeMissingPersonsByOrg } from "@/lib/reportes/missing-persons-scope";
@@ -83,22 +83,18 @@ type VictimRow = {
     | null;
 };
 
-function resolveDestinoLabel(
-  notas: string | null | undefined,
-  estado_destino: CareState,
-): string {
-  const { destino } = parseDestino(notas);
-  if (isEnObservacionModulo(notas)) {
-    const fromState = careStateToDestino(estado_destino);
-    if (fromState) return fromState;
-  }
-  return destino;
-}
-
 function victimInfo(row: VictimRow) {
   const info = row.catastrophe_victim_info;
   if (!info) return null;
   return Array.isArray(info) ? info[0] ?? null : info;
+}
+
+function estadoParaClasificacion(
+  notas: string | null | undefined,
+  estado_destino: CareState | null | undefined,
+): CareState | null {
+  if (estado_destino) return estado_destino;
+  return isEnObservacionModulo(notas) ? "Triaje" : null;
 }
 
 export async function buildReportesSummary(
@@ -168,35 +164,38 @@ export async function buildReportesSummary(
 
   for (const v of (victimsRes.data ?? []) as VictimRow[]) {
     const info = victimInfo(v);
-    if (!info) continue;
-
-    const destino = resolveDestinoLabel(v.notas, info.estado_destino);
+    const estado_destino = info?.estado_destino ?? null;
+    const estadoClasificacion = estadoParaClasificacion(v.notas, estado_destino);
+    const destino = resolveDestinoPaciente(v.notas, estadoClasificacion);
     const row: ReportPatientRow = {
       id: v.id,
       registration_number: v.registration_number,
       nombre_completo: v.nombre_completo,
-      triage_category: info.triage_category,
+      triage_category: info?.triage_category ?? null,
       destino,
-      estado_destino: info.estado_destino,
-      fecha_hora_entrada: info.fecha_hora_entrada,
-      motivo_principal_consulta: info.motivo_principal_consulta,
+      estado_destino,
+      fecha_hora_entrada: info?.fecha_hora_entrada ?? null,
+      motivo_principal_consulta: info?.motivo_principal_consulta ?? null,
     };
 
-    if (info.triage_category in triaje) {
+    if (info?.triage_category && info.triage_category in triaje) {
       triaje[info.triage_category as TriageCategory]++;
     }
-    if (info.estado_destino in estados) {
-      estados[info.estado_destino as CareState]++;
+    if (estado_destino && estado_destino in estados) {
+      estados[estado_destino as CareState]++;
     }
 
-    if (isPacienteEnObservacion(v.notas, info.estado_destino)) {
+    if (isPacienteEnObservacion(v.notas, estadoClasificacion)) {
       observationRows.push(row);
-      if (info.triage_category in obsTriaje) {
+      if (info?.triage_category && info.triage_category in obsTriaje) {
         obsTriaje[info.triage_category as TriageCategory]++;
       }
-    } else {
-      dischargedRows.push(row);
-      const bucket = bucketDestinoAltaTraslado(v.notas, info.estado_destino);
+    } else if (isPacienteDadoDeAltaOTraslado(v.notas, estadoClasificacion)) {
+      dischargedRows.push({
+        ...row,
+        destino: v.notas?.trim() || destino,
+      });
+      const bucket = bucketDestinoAltaTraslado(v.notas, estadoClasificacion);
       porDestino[bucket] = (porDestino[bucket] ?? 0) + 1;
     }
   }
