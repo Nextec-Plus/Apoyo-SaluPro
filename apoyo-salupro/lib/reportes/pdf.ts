@@ -174,11 +174,7 @@ function drawCohortPatientTable(
     styles: { fontSize: 7, cellPadding: 2, overflow: "linebreak" },
     headStyles: { fillColor: PRIMARY, textColor: 255, fontStyle: "bold" },
     margin: { left: margin, right: margin },
-    didParseCell: (data: {
-      section: string;
-      row: { index: number };
-      cell: { styles: { fillColor?: [number, number, number] } };
-    }) => {
+    didParseCell: (data) => {
       if (!colorRows || data.section !== "body") return;
       const triage = triages[data.row.index];
       if (triage && TRIAGE_ROW_FILL[triage]) {
