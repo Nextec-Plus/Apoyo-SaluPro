@@ -251,7 +251,7 @@ export function TabDesaparecidos() {
       }
       resetForm();
       setReloadToken((t) => t + 1); // refresca stats + listado
-      setView("registros");
+      if (!esFallecida) setView("registros");
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Error inesperado";
       setFormError(msg);

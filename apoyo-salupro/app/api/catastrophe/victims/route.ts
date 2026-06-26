@@ -177,6 +177,28 @@ export async function POST(request: NextRequest) {
     return Response.json({ data: null, error: 'nombre_completo es requerido' }, { status: 400 })
   }
 
+  // Validación de cédula duplicada: normalizar a solo dígitos en ambos lados.
+  const inputDigits = body.cedula ? body.cedula.replace(/\D/g, '') : ''
+  if (inputDigits) {
+    // ilike '%dígitos%' acota candidatos rápidamente; luego se confirma exactitud en JS.
+    const { data: candidates } = await supabase
+      .from('catastrophe_victims')
+      .select('id, cedula, nombre_completo')
+      .eq('organization_id', body.organization_id)
+      .ilike('cedula', `%${inputDigits}%`)
+      .limit(50)
+
+    const duplicate = (candidates ?? []).find(
+      (v) => v.cedula && v.cedula.replace(/\D/g, '') === inputDigits,
+    )
+    if (duplicate) {
+      return Response.json(
+        { data: null, error: `Ya existe un paciente con esa cédula: ${duplicate.nombre_completo}` },
+        { status: 409 },
+      )
+    }
+  }
+
   // Auto-generate registration_number: V-001, V-002, ...
   // Uses the latest registration_number (not COUNT) to avoid collisions when
   // records have been deleted or inserted out of sequence (e.g. bulk uploads).
