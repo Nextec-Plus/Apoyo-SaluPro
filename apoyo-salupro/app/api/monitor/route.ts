@@ -2,7 +2,8 @@ import type { NextRequest } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { parseDestino } from '@/lib/catastrophe-destinos'
 
-const ACTIVE_STATES = new Set(['Triaje', 'En Atención', 'Hospitalizado'])
+const ACTIVE_STATES = ['Triaje', 'En Atención', 'Hospitalizado'] as const
+const ACTIVE_STATES_SET = new Set<string>(ACTIVE_STATES)
 
 export async function GET(req: NextRequest) {
   const apiKey = req.headers.get('x-api-key')
@@ -38,7 +39,7 @@ export async function GET(req: NextRequest) {
         fecha_hora_entrada
       )
     `)
-    .in('catastrophe_victim_info.estado_destino', Array.from(ACTIVE_STATES))
+    .in('catastrophe_victim_info.estado_destino', ACTIVE_STATES)
     .order('created_at', { ascending: false })
     .limit(limit)
 
@@ -80,7 +81,7 @@ export async function GET(req: NextRequest) {
 
     if (estadoDestino) {
       estados[estadoDestino] = (estados[estadoDestino] ?? 0) + 1
-      if (ACTIVE_STATES.has(estadoDestino)) casosActivos++
+      if (ACTIVE_STATES_SET.has(estadoDestino)) casosActivos++
     }
     if (triageCategory) {
       triaje[triageCategory] = (triaje[triageCategory] ?? 0) + 1
