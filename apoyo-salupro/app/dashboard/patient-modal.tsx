@@ -165,6 +165,8 @@ export function PatientModal({
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState<PatientForm | null>(null);
+  const [sendingSaluPro, setSendingSaluPro] = useState(false);
+  const [confirmSaluPro, setConfirmSaluPro] = useState(false);
 
   const [showAddContact, setShowAddContact] = useState(false);
   const [newContact, setNewContact] = useState<ContactForm>(emptyContactForm);
@@ -223,6 +225,30 @@ export function PatientModal({
   const cancelEditing = () => {
     setEditing(false);
     setForm(null);
+  };
+
+  const sendToSaluPro = async () => {
+    setSendingSaluPro(true);
+    try {
+      const res = await fetch(`/api/catastrophe/victims/${victimId}/send-to-salupro`, { method: "POST" });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? "Error al enviar a SaluPro");
+      toast.success("Consulta enviada a SaluPro correctamente");
+      // Actualizar estado local para reflejar que ya fue enviado
+      setVictim((prev) => {
+        if (!prev) return prev;
+        const sentAt = new Date().toISOString();
+        const prevInfo = prev.catastrophe_victim_info;
+        const updatedInfo = Array.isArray(prevInfo)
+          ? prevInfo.map((i, idx) => idx === 0 ? { ...i, salupro_sent_at: sentAt } : i)
+          : prevInfo ? { ...prevInfo, salupro_sent_at: sentAt } : prevInfo;
+        return { ...prev, catastrophe_victim_info: updatedInfo };
+      });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Error al enviar a SaluPro");
+    } finally {
+      setSendingSaluPro(false);
+    }
   };
 
   const updateForm = (patch: Partial<PatientForm>) => {
@@ -455,6 +481,56 @@ export function PatientModal({
     </div>
   );
 
+  if (confirmSaluPro && victim) {
+    return (
+      <div
+        className="fixed inset-0 z-[70] flex items-center justify-center p-4"
+        role="dialog"
+        aria-modal="true"
+      >
+        <button
+          type="button"
+          className="absolute inset-0 bg-gray-900/60 backdrop-blur-sm"
+          onClick={() => setConfirmSaluPro(false)}
+          aria-label="Cancelar"
+        />
+        <div className="relative bg-white rounded-2xl shadow-2xl border border-border w-full max-w-sm p-6 flex flex-col gap-4">
+          <div className="flex items-center gap-3">
+            <img src="/isotipo_salupro_light.png" alt="SaluPro" className="w-8 h-8 object-contain" />
+            <h2 className="text-base font-bold text-gray-900">Enviar a SaluPro</h2>
+          </div>
+          <p className="text-sm text-gray-600">
+            ¿Confirmas que deseas enviar el caso de{" "}
+            <span className="font-semibold text-gray-900">{victim.nombre_completo}</span>{" "}
+            {victim.cedula && <span className="text-gray-500">(CI: {victim.cedula})</span>}{" "}
+            a SaluPro como consulta externa?
+          </p>
+          <p className="text-xs text-gray-400">
+            Esta acción no se puede deshacer. El caso quedará en estado <strong>PENDIENTE</strong> en SaluPro.
+          </p>
+          <div className="flex gap-2 justify-end pt-1">
+            <button
+              type="button"
+              onClick={() => setConfirmSaluPro(false)}
+              className="text-sm font-medium text-gray-600 border border-border rounded-lg px-4 py-2 hover:bg-gray-50 transition-colors"
+            >
+              Cancelar
+            </button>
+            <button
+              type="button"
+              disabled={sendingSaluPro}
+              onClick={() => { setConfirmSaluPro(false); sendToSaluPro(); }}
+              className="flex items-center gap-1.5 text-sm font-semibold text-white bg-teal-600 hover:bg-teal-700 border border-teal-700 rounded-lg px-4 py-2 disabled:opacity-60 transition-colors"
+            >
+              <img src="/isotipo_salupro_light.png" alt="" className="w-4 h-4 object-contain" />
+              Confirmar envío
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div
       className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center p-0 sm:p-6"
@@ -508,13 +584,35 @@ export function PatientModal({
               </button>
             )}
             {victim && !editing && !loading && (
-              <button
-                type="button"
-                onClick={startEditing}
-                className="text-xs font-semibold text-primary border border-primary/30 rounded-lg px-3 py-2 bg-primary/5 hover:text-primary-dark transition-colors"
-              >
-                Editar ficha
-              </button>
+              <>
+                {info?.salupro_sent_at ? (
+                  <span
+                    title={`Enviado el ${new Date(info.salupro_sent_at).toLocaleString('es-VE')}`}
+                    className="flex items-center gap-1.5 text-xs font-semibold text-teal-700 bg-teal-50 border border-teal-200 rounded-lg px-3 py-2 cursor-default"
+                  >
+                    <img src="/isotipo_salupro_light.png" alt="" className="w-4 h-4 object-contain opacity-70" />
+                    Enviado a SaluPro
+                  </span>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setConfirmSaluPro(true)}
+                    disabled={sendingSaluPro || !victim.cedula}
+                    title={!victim.cedula ? "Se requiere cédula para enviar a SaluPro" : "Enviar consulta a SaluPro"}
+                    className="flex items-center gap-1.5 text-xs font-semibold text-white bg-teal-600 hover:bg-teal-700 border border-teal-700 rounded-lg px-3 py-2 disabled:opacity-60 transition-colors"
+                  >
+                    <img src="/isotipo_salupro_light.png" alt="" className="w-4 h-4 object-contain" />
+                    {sendingSaluPro ? "Enviando…" : "Enviar a SaluPro"}
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={startEditing}
+                  className="text-xs font-semibold text-primary border border-primary/30 rounded-lg px-3 py-2 bg-primary/5 hover:text-primary-dark transition-colors"
+                >
+                  Editar ficha
+                </button>
+              </>
             )}
             <button
               type="button"

@@ -129,6 +129,7 @@ export type Database = {
           id: string
           motivo_principal_consulta: string | null
           organization_id: string
+          salupro_sent_at: string | null
           tratamiento_medicamentos: string | null
           triage_category: Database["public"]["Enums"]["triage_category"]
           updated_at: string
@@ -144,6 +145,7 @@ export type Database = {
           id?: string
           motivo_principal_consulta?: string | null
           organization_id: string
+          salupro_sent_at?: string | null
           tratamiento_medicamentos?: string | null
           triage_category: Database["public"]["Enums"]["triage_category"]
           updated_at?: string
@@ -159,6 +161,7 @@ export type Database = {
           id?: string
           motivo_principal_consulta?: string | null
           organization_id?: string
+          salupro_sent_at?: string | null
           tratamiento_medicamentos?: string | null
           triage_category?: Database["public"]["Enums"]["triage_category"]
           updated_at?: string
