@@ -178,21 +178,43 @@ export async function POST(request: NextRequest) {
   }
 
   // Auto-generate registration_number: V-001, V-002, ...
-  const { count } = await supabase
+  // Uses the latest registration_number (not COUNT) to avoid collisions when
+  // records have been deleted or inserted out of sequence (e.g. bulk uploads).
+  const { data: maxRow } = await supabase
     .from('catastrophe_victims')
-    .select('*', { count: 'exact', head: true })
+    .select('registration_number')
     .eq('organization_id', body.organization_id)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
 
-  const nextNumber = String((count ?? 0) + 1).padStart(3, '0')
-  const registration_number = `V-${nextNumber}`
+  const lastNum = maxRow?.registration_number
+    ? parseInt(maxRow.registration_number.replace(/\D/g, ''), 10) || 0
+    : 0
 
-  const { data, error } = await supabase
-    .from('catastrophe_victims')
-    .insert({ ...body, registration_number })
-    .select()
-    .single()
+  // Retry up to 20 times in case of concurrent inserts grabbing the same number
+  let data = null
+  let insertErrMsg: string | null = null
+  for (let attempt = 1; attempt <= 20; attempt++) {
+    const registration_number = `V-${String(lastNum + attempt).padStart(3, '0')}`
+    const result = await supabase
+      .from('catastrophe_victims')
+      .insert({ ...body, registration_number })
+      .select()
+      .single()
 
-  if (error) return Response.json({ data: null, error: error.message }, { status: 500 })
+    if (!result.error) { data = result.data; break }
+    if (result.error.code === '23505' && result.error.message.includes('registration_number')) continue
+    insertErrMsg = result.error.message
+    break
+  }
+
+  if (!data) {
+    return Response.json(
+      { data: null, error: insertErrMsg ?? 'No se encontró registration_number disponible' },
+      { status: 500 },
+    )
+  }
 
   const found_matches = await syncMissingPersonMatches(supabase, {
     id: data.id,
