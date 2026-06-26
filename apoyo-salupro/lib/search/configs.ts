@@ -89,7 +89,7 @@ export const patientsFilterDefs = [
     label: "Cédula",
     type: "text" as const,
     allValue: "",
-    placeholder: "V-00000000",
+    placeholder: "Número de cédula",
   },
   {
     key: "edad_min" as const,

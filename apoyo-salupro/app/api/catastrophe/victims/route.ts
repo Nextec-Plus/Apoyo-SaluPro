@@ -83,39 +83,38 @@ export async function GET(request: NextRequest) {
   // ── Modo cursor pagination ──────────────────────────────────────────────
   const limit = Math.max(1, Math.min(60, Number(limitParam) || 25))
 
-  let query = supabase
+  const validTriage = new Set<string>(["Rojo", "Amarillo", "Verde"])
+  const validCareState = new Set<string>(["Triaje", "En Atención", "Hospitalizado", "Transferido", "Alta Médica", "Anulado"])
+  const filterTriage = triage_level && validTriage.has(triage_level)
+  const filterCareState = care_state && validCareState.has(care_state)
+
+  // !inner join cuando filtramos sobre victim_info → PostgREST descarta filas
+  // padre que no tienen info con los valores pedidos (LEFT JOIN no lo hace).
+  const infoJoin = (filterTriage || filterCareState)
+    ? 'catastrophe_victim_info!inner(triage_category, estado_destino, motivo_principal_consulta)'
+    : 'catastrophe_victim_info!catastrophe_victim_info_victim_id_fkey(triage_category, estado_destino, motivo_principal_consulta)'
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let query: any = supabase
     .from('catastrophe_victims')
-    // Solo la info necesaria para la lista virtualizada: info[0] con triage.
     .select(
-      'id, organization_id, nombre_completo, cedula, edad, genero, sector_comunidad, registration_number, notas, created_at, updated_at, catastrophe_victim_info!catastrophe_victim_info_victim_id_fkey(triage_category, estado_destino, motivo_principal_consulta)',
+      `id, organization_id, nombre_completo, cedula, edad, genero, sector_comunidad, registration_number, notas, created_at, updated_at, ${infoJoin}`,
     )
     .eq('organization_id', organization_id)
     .order('created_at', { ascending: false })
     .order('id', { ascending: false })
     .limit(limit)
 
-  if (cedula) query = query.ilike('cedula', `%${cedula}%`)
+  if (cedula) query = query.ilike('cedula', `%${cedula.replace(/^[Vv]-?/, '')}%`)
   if (search) query = applyVictimSearch(query, search, useIndex)
   if (genero) query = query.eq('genero', genero)
   if (edadMin) query = query.gte('edad', Number(edadMin))
   if (edadMax) query = query.lte('edad', Number(edadMax))
-  if (triage_level) {
-    const valid = new Set<string>(["Rojo", "Amarillo", "Verde"])
-    if (valid.has(triage_level)) {
-      query = query.eq(
-        'catastrophe_victim_info.triage_category',
-        triage_level as TriageCategory,
-      )
-    }
+  if (filterTriage) {
+    query = query.eq('catastrophe_victim_info.triage_category', triage_level as TriageCategory)
   }
-  if (care_state) {
-    const validStates = new Set<string>(["Triaje", "En Atención", "Hospitalizado", "Transferido", "Alta Médica", "Anulado"])
-    if (validStates.has(care_state)) {
-      query = query.eq(
-        'catastrophe_victim_info.estado_destino',
-        care_state as CareState,
-      )
-    }
+  if (filterCareState) {
+    query = query.eq('catastrophe_victim_info.estado_destino', care_state as CareState)
   }
   if (destino && (DESTINOS as readonly string[]).includes(destino)) {
     if (destino === OBSERVACION_MODULO_MOVIL) {
