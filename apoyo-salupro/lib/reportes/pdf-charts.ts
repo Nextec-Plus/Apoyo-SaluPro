@@ -2,6 +2,7 @@ import type { jsPDF } from "jspdf";
 
 export type BarItem = {
   label: string;
+  sub?: string;
   value: number;
   color: [number, number, number];
 };
@@ -23,6 +24,7 @@ export function drawHorizontalBarChart(
   const barAreaW = width - labelW - valueW - 4;
   const barH = 7;
   const gap = 3;
+  const rowExtra = items.some((i) => i.sub) ? 4 : 0;
   const max = Math.max(...items.map((i) => i.value), 1);
 
   doc.setFontSize(10);
@@ -35,7 +37,13 @@ export function drawHorizontalBarChart(
   for (const item of items) {
     doc.setFontSize(8);
     doc.setTextColor(75, 85, 99);
+    doc.setFont("helvetica", "bold");
     doc.text(item.label, x, cy + 5);
+    if (item.sub) {
+      doc.setFontSize(6.5);
+      doc.setFont("helvetica", "normal");
+      doc.text(item.sub, x, cy + 9);
+    }
 
     const barX = x + labelW;
     const barLen = barAreaW * (item.value / max);
@@ -49,7 +57,7 @@ export function drawHorizontalBarChart(
     doc.text(item.value.toLocaleString("es-VE"), barX + barAreaW + 2, cy + 5);
     doc.setFont("helvetica", "normal");
 
-    cy += barH + gap;
+    cy += barH + gap + rowExtra;
   }
 
   return cy + 4;
@@ -62,11 +70,12 @@ export function drawKpiRow(
     x: number;
     y: number;
     width: number;
-    items: { label: string; value: number; color?: [number, number, number] }[];
+    items: { label: string; sub?: string; value: number; color?: [number, number, number] }[];
   },
 ): number {
   const { x, y, width, items } = opts;
   const colW = width / items.length;
+  const hasSub = items.some((item) => item.sub);
 
   items.forEach((item, i) => {
     const cx = x + i * colW + colW / 2;
@@ -79,9 +88,13 @@ export function drawKpiRow(
     doc.setFont("helvetica", "normal");
     doc.setTextColor(107, 114, 128);
     doc.text(item.label.toUpperCase(), cx, y + 12, { align: "center" });
+    if (item.sub) {
+      doc.setFontSize(6);
+      doc.text(item.sub, cx, y + 16, { align: "center" });
+    }
   });
 
-  return y + 18;
+  return y + (hasSub ? 22 : 18);
 }
 
 export type LegendItem = {

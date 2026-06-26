@@ -1,5 +1,6 @@
 "use client";
 
+import { parseDestino } from "@/lib/catastrophe-destinos";
 import { generoDbToUi } from "@/lib/config";
 import { patientsConfig } from "@/lib/search/configs";
 import type { PatientSearchItem, PatientSearchInfo } from "@/lib/search/types";
@@ -54,6 +55,7 @@ function PatientsVirtualizedList({
       skeletonCount={6}
       renderRow={(p: PatientSearchItem) => {
         const info = getInfo(p);
+        const destinoLabel = parseDestino(p.notas).destino;
         return (
           <button
             type="button"
@@ -86,6 +88,9 @@ function PatientsVirtualizedList({
                   {info.triage_category}
                 </span>
               )}
+              <span className="text-[10px] font-medium text-gray-500 px-2 py-0.5 rounded border border-gray-200 bg-gray-50 max-w-[9rem] truncate">
+                {destinoLabel}
+              </span>
               <span className="text-[10px] text-gray-400 font-mono">
                 {p.registration_number}
               </span>

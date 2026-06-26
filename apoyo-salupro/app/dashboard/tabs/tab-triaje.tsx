@@ -2,6 +2,13 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useToast } from "@/components/toast-provider";
+import {
+  DESTINOS_ALTA_TRASLADO,
+  destinoToCareState,
+  formatDestino,
+  isEnObservacionModulo,
+  isReferidoHospital,
+} from "@/lib/catastrophe-destinos";
 import { TRIAGE_UPDATED_EVENT } from "@/lib/events";
 import type { CareState, CatastropheVictim, CatastropheVictimInfo, TriageCategory } from "@/lib/types/database";
 
@@ -94,19 +101,26 @@ function PatientCard({
   caso,
   isDragging,
   pendingMove,
+  isUpdatingDestino,
   onDragStart,
   onDragEnd,
   onMoveTo,
+  onUpdateDestino,
 }: {
   caso: TriageCase;
   isDragging: boolean;
   pendingMove?: PendingMoveUI;
+  isUpdatingDestino: boolean;
   onDragStart: (caseId: string, e: React.DragEvent) => void;
   onDragEnd: () => void;
   onMoveTo: (caseId: string, category: ColumnId) => void;
+  onUpdateDestino: (caseId: string, destino: string, hospital: string) => void;
 }) {
   const victim = caso.catastrophe_victims;
   const status = patientStatus(caso);
+  const [dischargeOpen, setDischargeOpen] = useState(false);
+  const [destino, setDestino] = useState<string>(DESTINOS_ALTA_TRASLADO[0]);
+  const [hospital, setHospital] = useState("");
 
   return (
     <div
@@ -199,6 +213,70 @@ function PatientCard({
           </button>
         ))}
       </div>
+
+      <div className="pt-1 border-t border-border/60">
+        {!dischargeOpen ? (
+          <button
+            type="button"
+            disabled={!!pendingMove || isUpdatingDestino}
+            onClick={() => setDischargeOpen(true)}
+            onPointerDown={(e) => e.stopPropagation()}
+            className="w-full text-[10px] font-semibold py-1.5 rounded border border-border text-gray-600 hover:border-primary/40 hover:text-primary transition-colors disabled:opacity-40"
+          >
+            Dar de Alta / Traslado
+          </button>
+        ) : (
+          <div
+            className="space-y-2"
+            onPointerDown={(e) => e.stopPropagation()}
+          >
+            <select
+              value={destino}
+              onChange={(e) => {
+                const next = e.target.value;
+                setDestino(next);
+                if (!isReferidoHospital(next)) setHospital("");
+              }}
+              disabled={isUpdatingDestino}
+              className="w-full text-[11px] rounded border border-border px-2 py-1.5 bg-white text-gray-800"
+            >
+              {DESTINOS_ALTA_TRASLADO.map((d) => (
+                <option key={d} value={d}>
+                  {d}
+                </option>
+              ))}
+            </select>
+            {isReferidoHospital(destino) && (
+              <input
+                type="text"
+                value={hospital}
+                onChange={(e) => setHospital(e.target.value)}
+                disabled={isUpdatingDestino}
+                placeholder="Hospital / Clínica de destino"
+                className="w-full text-[11px] rounded border border-border px-2 py-1.5 bg-white text-gray-800 placeholder-gray-400"
+              />
+            )}
+            <div className="flex gap-1">
+              <button
+                type="button"
+                disabled={isUpdatingDestino}
+                onClick={() => setDischargeOpen(false)}
+                className="flex-1 text-[10px] font-semibold py-1 rounded border border-border text-gray-500 hover:bg-muted transition-colors disabled:opacity-40"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                disabled={isUpdatingDestino}
+                onClick={() => onUpdateDestino(caso.id, destino, hospital)}
+                className="flex-1 text-[10px] font-bold py-1 rounded bg-primary text-white hover:bg-primary-dark transition-colors disabled:opacity-40"
+              >
+                {isUpdatingDestino ? "Guardando…" : "Confirmar"}
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -252,6 +330,7 @@ export function TabTriaje() {
   >(() => new Map());
   const [search, setSearch] = useState("");
   const [visibleCounts, setVisibleCounts] = useState(initialVisibleCounts);
+  const [updatingDestinoId, setUpdatingDestinoId] = useState<string | null>(null);
 
   const casesRef = useRef(cases);
   casesRef.current = cases;
@@ -509,9 +588,66 @@ export function TabTriaje() {
     }, 0);
   }, []);
 
+  const observationCases = useMemo(
+    () =>
+      cases.filter((c) => isEnObservacionModulo(c.catastrophe_victims?.notas)),
+    [cases],
+  );
+
   const filteredCases = useMemo(
-    () => cases.filter((c) => matchesSearch(c, search)),
-    [cases, search],
+    () => observationCases.filter((c) => matchesSearch(c, search)),
+    [observationCases, search],
+  );
+
+  const updateDestino = useCallback(
+    async (caseId: string, destino: string, hospital: string) => {
+      const current = casesRef.current.find((c) => c.id === caseId);
+      if (!current) return;
+
+      const victimId = current.catastrophe_victims?.id;
+      if (!victimId) {
+        toastRef.current.error("No se encontró el registro del paciente");
+        return;
+      }
+
+      const patientName =
+        current.catastrophe_victims?.nombre_completo ?? "Paciente";
+      const notas = formatDestino(destino, hospital);
+      const snapshot = current;
+
+      setUpdatingDestinoId(caseId);
+      setCases((prev) => prev.filter((c) => c.id !== caseId));
+
+      try {
+        const res = await fetch(`/api/catastrophe/cases/${caseId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            estado_destino: destinoToCareState(destino),
+            notas,
+          }),
+        });
+        const json = await res.json();
+
+        if (!res.ok || json.error) {
+          throw new Error(json.error ?? "No se pudo actualizar el destino del paciente");
+        }
+
+        toastRef.current.success(`${patientName} → ${destino}`);
+        window.dispatchEvent(new CustomEvent(TRIAGE_UPDATED_EVENT));
+      } catch (err) {
+        setCases((prev) => {
+          if (prev.some((c) => c.id === caseId)) return prev;
+          return [...prev, snapshot];
+        });
+        toastRef.current.error(
+          err instanceof Error ? err.message : "Error al actualizar el destino",
+        );
+      } finally {
+        setUpdatingDestinoId(null);
+      }
+    },
+    [],
   );
 
   const byCategory = useCallback(
@@ -551,7 +687,7 @@ export function TabTriaje() {
           <div>
             <h2 className="text-lg font-bold text-gray-800">Tablero de Triaje</h2>
             <p className="text-xs text-gray-500 mt-0.5">
-              Arrastra las tarjetas entre columnas para reclasificar pacientes.
+              Pacientes en observación en módulo móvil. Arrastra entre columnas para reclasificar o da de alta / traslado.
             </p>
           </div>
           <button
@@ -639,9 +775,11 @@ export function TabTriaje() {
                       caso={caso}
                       isDragging={draggingId === caso.id}
                       pendingMove={pendingMovesUI.get(caso.id)}
+                      isUpdatingDestino={updatingDestinoId === caso.id}
                       onDragStart={handleDragStart}
                       onDragEnd={handleDragEnd}
                       onMoveTo={moveCase}
+                      onUpdateDestino={updateDestino}
                     />
                   ))}
 
@@ -684,13 +822,13 @@ export function TabTriaje() {
         </div>
       )}
 
-      {!loading && cases.length === 0 && (
+      {!loading && observationCases.length === 0 && (
         <p className="shrink-0 mt-2 text-center text-xs text-gray-400">
-          No hay pacientes registrados en triaje. Los ingresos desde Ficha Médica aparecerán aquí.
+          No hay pacientes en observación en módulo móvil. Los ingresos desde Ficha Médica con ese destino aparecerán aquí.
         </p>
       )}
 
-      {!loading && cases.length > 0 && filteredCases.length === 0 && search.trim() && (
+      {!loading && observationCases.length > 0 && filteredCases.length === 0 && search.trim() && (
         <p className="shrink-0 mt-2 text-center text-xs text-gray-400">
           Sin resultados para &ldquo;{search.trim()}&rdquo;
         </p>

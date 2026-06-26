@@ -6,6 +6,11 @@ import {
   applyVictimSearch,
   hasVictimSearchIndex,
 } from '@/lib/catastrophe-victims-search'
+import {
+  DESTINOS,
+  OBSERVACION_MODULO_MOVIL,
+  REFERIDO_HOSPITAL,
+} from '@/lib/catastrophe-destinos'
 
 /**
  * Tope de filas del modo legacy (GET sin `limit`). El modo legacy es interno y
@@ -42,6 +47,7 @@ export async function GET(request: NextRequest) {
   const search = searchParams.get('search')
   const triage_level = searchParams.get('triage_level')
   const care_state = searchParams.get('care_state')
+  const destino = searchParams.get('destino')
   const genero = searchParams.get('genero')
   const edadMin = searchParams.get('edad_min')
   const edadMax = searchParams.get('edad_max')
@@ -81,7 +87,7 @@ export async function GET(request: NextRequest) {
     .from('catastrophe_victims')
     // Solo la info necesaria para la lista virtualizada: info[0] con triage.
     .select(
-      'id, organization_id, nombre_completo, cedula, edad, genero, sector_comunidad, registration_number, created_at, updated_at, catastrophe_victim_info!catastrophe_victim_info_victim_id_fkey(triage_category, estado_destino, motivo_principal_consulta)',
+      'id, organization_id, nombre_completo, cedula, edad, genero, sector_comunidad, registration_number, notas, created_at, updated_at, catastrophe_victim_info!catastrophe_victim_info_victim_id_fkey(triage_category, estado_destino, motivo_principal_consulta)',
     )
     .eq('organization_id', organization_id)
     .order('created_at', { ascending: false })
@@ -109,6 +115,17 @@ export async function GET(request: NextRequest) {
         'catastrophe_victim_info.estado_destino',
         care_state as CareState,
       )
+    }
+  }
+  if (destino && (DESTINOS as readonly string[]).includes(destino)) {
+    if (destino === OBSERVACION_MODULO_MOVIL) {
+      query = query.or(
+        `notas.is.null,notas.eq.,notas.eq.${OBSERVACION_MODULO_MOVIL}`,
+      )
+    } else if (destino === REFERIDO_HOSPITAL) {
+      query = query.ilike('notas', `${REFERIDO_HOSPITAL}%`)
+    } else {
+      query = query.eq('notas', destino)
     }
   }
 

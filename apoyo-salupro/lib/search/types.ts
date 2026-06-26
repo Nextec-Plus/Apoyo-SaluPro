@@ -152,6 +152,7 @@ export type PatientSearchItem = Pick<
   | "genero"
   | "sector_comunidad"
   | "registration_number"
+  | "notas"
   | "created_at"
   | "updated_at"
 > & {

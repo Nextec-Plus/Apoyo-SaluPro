@@ -1,14 +1,51 @@
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
+import { DESTINOS_ALTA_TRASLADO, DESTINO_OTROS } from "@/lib/catastrophe-destinos";
 import type { ExportPayload, ResumenPatientRow } from "@/lib/reportes/export-data";
 import { drawColorLegend, drawHorizontalBarChart, drawKpiRow } from "@/lib/reportes/pdf-charts";
 import { getSaluProLogoDataUrl } from "@/lib/reportes/pdf-logo";
+import { TRIAGE_LEVELS } from "@/lib/triage-levels";
+import type { TriageCategory } from "@/lib/types/database";
 
 const PRIMARY: [number, number, number] = [45, 106, 45];
 const GREEN: [number, number, number] = [22, 163, 74];
 const YELLOW: [number, number, number] = [245, 158, 11];
 const RED: [number, number, number] = [198, 40, 40];
+const BLUE: [number, number, number] = [37, 99, 235];
 const GRAY: [number, number, number] = [107, 114, 128];
+
+const DESTINO_CHART_COLORS: Record<string, [number, number, number]> = {
+  "Dado de alta (Ambulatorio)": GREEN,
+  "Referido al Hospital": RED,
+  "Trasladado a Refugio Oficial": BLUE,
+  [DESTINO_OTROS]: GRAY,
+};
+
+function ensureSpace(doc: jsPDF, y: number, needed: number, margin: number): number {
+  const pageH = doc.internal.pageSize.getHeight();
+  if (y + needed > pageH - margin) {
+    doc.addPage();
+    return margin;
+  }
+  return y;
+}
+
+function destinoChartItems(porDestino: Record<string, number>) {
+  const items: { label: string; value: number; color: [number, number, number] }[] =
+    DESTINOS_ALTA_TRASLADO.map((label) => ({
+      label,
+      value: porDestino[label] ?? 0,
+      color: DESTINO_CHART_COLORS[label] ?? GRAY,
+    }));
+  if ((porDestino[DESTINO_OTROS] ?? 0) > 0) {
+    items.push({
+      label: DESTINO_OTROS,
+      value: porDestino[DESTINO_OTROS],
+      color: GRAY,
+    });
+  }
+  return items;
+}
 
 const TRIAGE_ROW_FILL: Record<string, [number, number, number]> = {
   Verde: [232, 245, 233],
@@ -16,23 +53,35 @@ const TRIAGE_ROW_FILL: Record<string, [number, number, number]> = {
   Rojo: [255, 235, 238],
 };
 
-const TRIAGE_LEGEND = [
-  {
-    color: GREEN,
-    label: "Verde",
-    description: "Leve / ambulatorio — puede continuar con seguimiento ambulatorio.",
-  },
-  {
-    color: YELLOW,
-    label: "Amarillo",
-    description: "Moderado / en observación — requiere vigilancia clínica.",
-  },
-  {
-    color: RED,
-    label: "Rojo",
-    description: "Grave / emergencia inmediata — atención urgente.",
-  },
-] as const;
+const TRIAGE_CHART_COLORS: Record<TriageCategory, [number, number, number]> = {
+  Verde: GREEN,
+  Amarillo: YELLOW,
+  Rojo: RED,
+};
+
+function triageKpiItems(triaje: Record<TriageCategory, number>) {
+  return TRIAGE_LEVELS.map((level) => ({
+    label: level.id,
+    sub: level.sub,
+    value: triaje[level.id],
+    color: TRIAGE_CHART_COLORS[level.id],
+  }));
+}
+
+function triageBarItems(triaje: Record<TriageCategory, number>) {
+  return TRIAGE_LEVELS.map((level) => ({
+    label: level.barLabel,
+    sub: level.sub,
+    value: triaje[level.id],
+    color: TRIAGE_CHART_COLORS[level.id],
+  }));
+}
+
+const TRIAGE_LEGEND = TRIAGE_LEVELS.map((level) => ({
+  color: TRIAGE_CHART_COLORS[level.id],
+  label: level.id,
+  description: level.sub,
+}));
 
 const MISSING_LEGEND = [
   {
@@ -95,41 +144,87 @@ function drawPdfHeader(doc: jsPDF, title: string, subtitle?: string): number {
   return y + 6;
 }
 
-function drawPatientListTable(
+function drawCohortPatientTable(
   doc: jsPDF,
   startY: number,
   margin: number,
-  patientList: NonNullable<ExportPayload["patientList"]>,
-) {
+  title: string,
+  patientList: { headers: string[]; rows: ResumenPatientRow[] },
+  colorRows: boolean,
+): number {
   const triages = patientList.rows.map((r) => r.triage);
 
   doc.setFontSize(11);
   doc.setTextColor(31, 41, 55);
   doc.setFont("helvetica", "bold");
-  doc.text("Listado de pacientes", margin, startY);
+  doc.text(title, margin, startY);
   doc.setFont("helvetica", "normal");
+
+  if (patientList.rows.length === 0) {
+    doc.setFontSize(9);
+    doc.setTextColor(107, 114, 128);
+    doc.text("Sin registros.", margin, startY + 6);
+    return startY + 12;
+  }
 
   autoTable(doc, {
     startY: startY + 4,
     head: [patientList.headers],
-    body: patientList.rows.map((r: ResumenPatientRow) => r.cells.map(cell)),
-    styles: { fontSize: 8, cellPadding: 2, overflow: "linebreak" },
+    body: patientList.rows.map((r) => r.cells.map(cell)),
+    styles: { fontSize: 7, cellPadding: 2, overflow: "linebreak" },
     headStyles: { fillColor: PRIMARY, textColor: 255, fontStyle: "bold" },
-    columnStyles: {
-      0: { cellWidth: 42 },
-      1: { cellWidth: "auto" },
-      2: { cellWidth: 32 },
-      3: { cellWidth: 35 },
-    },
     margin: { left: margin, right: margin },
-    didParseCell: (data) => {
-      if (data.section !== "body") return;
+    didParseCell: (data: {
+      section: string;
+      row: { index: number };
+      cell: { styles: { fillColor?: [number, number, number] } };
+    }) => {
+      if (!colorRows || data.section !== "body") return;
       const triage = triages[data.row.index];
       if (triage && TRIAGE_ROW_FILL[triage]) {
         data.cell.styles.fillColor = TRIAGE_ROW_FILL[triage];
       }
     },
   });
+
+  const finalY = (doc as jsPDF & { lastAutoTable?: { finalY: number } }).lastAutoTable
+    ?.finalY;
+  return (finalY ?? startY) + 6;
+}
+
+function drawCohortCharts(
+  doc: jsPDF,
+  y: number,
+  margin: number,
+  contentW: number,
+  summary: NonNullable<ExportPayload["summary"]>,
+): number {
+  const obs = summary.pacientes.en_observacion;
+
+  y = drawKpiRow(doc, {
+    x: margin,
+    y,
+    width: contentW,
+    items: triageKpiItems(obs.triaje),
+  });
+
+  y = drawHorizontalBarChart(doc, {
+    x: margin,
+    y,
+    width: contentW,
+    title: "En observación — distribución por triaje",
+    items: triageBarItems(obs.triaje),
+  });
+
+  y = drawHorizontalBarChart(doc, {
+    x: margin,
+    y,
+    width: contentW,
+    title: "Dados de alta / traslados — distribución por destino",
+    items: destinoChartItems(summary.pacientes.dados_alta_traslado.por_destino),
+  });
+
+  return y + 2;
 }
 
 function buildResumenPdf(payload: ExportPayload): Buffer {
@@ -140,7 +235,6 @@ function buildResumenPdf(payload: ExportPayload): Buffer {
 
   let y = drawPdfHeader(doc, payload.title, payload.subtitle);
 
-  // ── Pacientes ───────────────────────────────────────────────────────────
   doc.setFontSize(11);
   doc.setTextColor(31, 41, 55);
   doc.setFont("helvetica", "bold");
@@ -154,22 +248,34 @@ function buildResumenPdf(payload: ExportPayload): Buffer {
     width: contentW,
     items: [
       { label: "Total", value: summary.pacientes.total },
-      { label: "Verde", value: summary.pacientes.triaje.Verde, color: GREEN },
-      { label: "Amarillo", value: summary.pacientes.triaje.Amarillo, color: YELLOW },
-      { label: "Rojo", value: summary.pacientes.triaje.Rojo, color: RED },
+      {
+        label: "En observación",
+        value: summary.pacientes.en_observacion.total,
+        color: PRIMARY,
+      },
     ],
+  });
+
+  y = ensureSpace(doc, y, 50, margin);
+  doc.setFontSize(10);
+  doc.setFont("helvetica", "bold");
+  doc.text("En observación — triaje activo", margin, y);
+  doc.setFont("helvetica", "normal");
+  y += 4;
+
+  y = drawKpiRow(doc, {
+    x: margin,
+    y,
+    width: contentW,
+    items: triageKpiItems(summary.pacientes.en_observacion.triaje),
   });
 
   y = drawHorizontalBarChart(doc, {
     x: margin,
     y,
     width: contentW,
-    title: "Distribución por triaje",
-    items: [
-      { label: "Verde", value: summary.pacientes.triaje.Verde, color: GREEN },
-      { label: "Amarillo", value: summary.pacientes.triaje.Amarillo, color: YELLOW },
-      { label: "Rojo", value: summary.pacientes.triaje.Rojo, color: RED },
-    ],
+    title: "Distribución por triaje (en observación)",
+    items: triageBarItems(summary.pacientes.en_observacion.triaje),
   });
 
   y = drawColorLegend(doc, {
@@ -180,9 +286,60 @@ function buildResumenPdf(payload: ExportPayload): Buffer {
     items: [...TRIAGE_LEGEND],
   });
 
+  y = ensureSpace(doc, y, 40, margin);
+  if (payload.observationPatientList) {
+    y = drawCohortPatientTable(
+      doc,
+      y,
+      margin,
+      "Pacientes en observación",
+      payload.observationPatientList,
+      true,
+    );
+  }
+
+  y = ensureSpace(doc, y, 50, margin);
+  doc.setFontSize(10);
+  doc.setFont("helvetica", "bold");
+  doc.text("Dados de alta y traslados", margin, y);
+  doc.setFont("helvetica", "normal");
   y += 4;
 
-  // ── Desaparecidos ───────────────────────────────────────────────────────
+  const destinoItems = destinoChartItems(
+    summary.pacientes.dados_alta_traslado.por_destino,
+  );
+  y = drawKpiRow(doc, {
+    x: margin,
+    y,
+    width: contentW,
+    items: destinoItems.map((item) => ({
+      label: item.label.length > 18 ? `${item.label.slice(0, 16)}…` : item.label,
+      value: item.value,
+      color: item.color,
+    })),
+  });
+
+  y = drawHorizontalBarChart(doc, {
+    x: margin,
+    y,
+    width: contentW,
+    title: "Distribución por destino",
+    items: destinoItems,
+  });
+
+  y = ensureSpace(doc, y, 40, margin);
+  if (payload.dischargedPatientList) {
+    y = drawCohortPatientTable(
+      doc,
+      y,
+      margin,
+      "Pacientes dados de alta / trasladados",
+      payload.dischargedPatientList,
+      false,
+    );
+  }
+
+  y = ensureSpace(doc, y, 60, margin);
   doc.setFontSize(11);
   doc.setTextColor(31, 41, 55);
   doc.setFont("helvetica", "bold");
@@ -214,24 +371,13 @@ function buildResumenPdf(payload: ExportPayload): Buffer {
     ],
   });
 
-  y = drawColorLegend(doc, {
+  drawColorLegend(doc, {
     x: margin,
     y,
     width: contentW,
     title: "Leyenda de colores — Personas desaparecidas",
     items: [...MISSING_LEGEND],
   });
-
-  y += 6;
-
-  // ── Listado de pacientes (reemplaza tabla Sección/Indicador/Cantidad) ─────
-  if (payload.patientList && payload.patientList.rows.length > 0) {
-    drawPatientListTable(doc, y, margin, payload.patientList);
-  } else if (payload.patientList) {
-    doc.setFontSize(10);
-    doc.setTextColor(107, 114, 128);
-    doc.text("Listado de pacientes: sin registros.", margin, y);
-  }
 
   return Buffer.from(doc.output("arraybuffer"));
 }
@@ -247,26 +393,8 @@ function buildTablePdf(payload: ExportPayload): Buffer {
   const contentW = doc.internal.pageSize.getWidth() - margin * 2;
   let y = drawPdfHeader(doc, payload.title, payload.subtitle);
 
-  if (payload.exportType === "pacientes") {
-    const triajeIdx = payload.headers.indexOf("Triaje");
-    const counts = { Verde: 0, Amarillo: 0, Rojo: 0 };
-    if (triajeIdx >= 0) {
-      for (const row of payload.rows) {
-        const t = String(row[triajeIdx] ?? "");
-        if (t in counts) counts[t as keyof typeof counts]++;
-      }
-    }
-    y = drawHorizontalBarChart(doc, {
-      x: margin,
-      y,
-      width: contentW,
-      title: "Distribución por triaje",
-      items: [
-        { label: "Verde", value: counts.Verde, color: GREEN },
-        { label: "Amarillo", value: counts.Amarillo, color: YELLOW },
-        { label: "Rojo", value: counts.Rojo, color: RED },
-      ],
-    });
+  if (payload.exportType === "pacientes" && payload.summary) {
+    y = drawCohortCharts(doc, y, margin, contentW, payload.summary);
     y = drawColorLegend(doc, {
       x: margin,
       y,

@@ -1,8 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { DESTINOS_ALTA_TRASLADO } from "@/lib/catastrophe-destinos";
 import { getClientOrganizationId } from "@/lib/config";
-import type { ReportesSummary } from "@/lib/reportes/summary";
+import type { ReportesSummary } from "@/lib/reportes/summary-types";
+import { TRIAGE_LEVELS } from "@/lib/triage-levels";
+import type { TriageCategory } from "@/lib/types/database";
 import { useToast } from "@/components/toast-provider";
 
 type ExportType = "resumen" | "pacientes" | "desaparecidos" | "encontrados" | "fallecidos";
@@ -12,12 +15,14 @@ type ExportKey = `${ExportType}:${ExportFormat}`;
 function StatCard({
   value,
   label,
+  sub,
   color,
   ring,
   loading,
 }: {
   value: number;
   label: string;
+  sub?: string;
   color: string;
   ring: string;
   loading: boolean;
@@ -30,17 +35,45 @@ function StatCard({
       <div className="mt-1 text-[11px] font-semibold uppercase tracking-wider text-gray-500 leading-tight">
         {label}
       </div>
+      {sub && (
+        <p className="mt-0.5 text-[10px] font-normal normal-case tracking-normal text-gray-400 leading-snug">
+          {sub}
+        </p>
+      )}
     </div>
   );
 }
 
+const TRIAGE_CARD_STYLES: Record<
+  TriageCategory,
+  { color: string; ring: string; barColor: string }
+> = {
+  Verde: {
+    color: "text-triage-green",
+    ring: "border-triage-green/25",
+    barColor: "bg-triage-green",
+  },
+  Amarillo: {
+    color: "text-triage-yellow",
+    ring: "border-triage-yellow/30",
+    barColor: "bg-triage-yellow",
+  },
+  Rojo: {
+    color: "text-crisis",
+    ring: "border-crisis/20",
+    barColor: "bg-crisis",
+  },
+};
+
 function TriageBar({
   label,
+  sub,
   count,
   total,
   color,
 }: {
   label: string;
+  sub: string;
   count: number;
   total: number;
   color: string;
@@ -48,9 +81,12 @@ function TriageBar({
   const pct = total > 0 ? Math.round((count / total) * 100) : 0;
   return (
     <div>
-      <div className="flex items-center justify-between text-xs mb-1">
-        <span className="font-semibold text-gray-700">{label}</span>
-        <span className="tabular-nums text-gray-500">
+      <div className="flex items-start justify-between gap-2 text-xs mb-1">
+        <div className="min-w-0">
+          <span className="font-semibold text-gray-700">{label}</span>
+          <p className="text-[10px] text-gray-400 font-normal mt-0.5">{sub}</p>
+        </div>
+        <span className="tabular-nums text-gray-500 shrink-0">
           {count.toLocaleString("es-VE")} ({pct}%)
         </span>
       </div>
@@ -158,10 +194,9 @@ export function TabReportes() {
     }
   };
 
-  const triajeTotal = summary
-    ? summary.pacientes.triaje.Verde +
-      summary.pacientes.triaje.Amarillo +
-      summary.pacientes.triaje.Rojo
+  const obsTriaje = summary?.pacientes.en_observacion.triaje;
+  const obsTriajeTotal = obsTriaje
+    ? obsTriaje.Verde + obsTriaje.Amarillo + obsTriaje.Rojo
     : 0;
 
   return (
@@ -197,9 +232,9 @@ export function TabReportes() {
 
         <div className="p-6 space-y-8">
           {/* Pacientes */}
-          <section>
-            <h3 className="text-sm font-bold text-gray-800 mb-3">Pacientes registrados</h3>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+          <section className="space-y-6">
+            <h3 className="text-sm font-bold text-gray-800">Pacientes registrados</h3>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 max-w-md">
               <StatCard
                 loading={loading}
                 value={summary?.pacientes.total ?? 0}
@@ -207,50 +242,76 @@ export function TabReportes() {
                 color="text-gray-900"
                 ring="border-border"
               />
-              <StatCard
-                loading={loading}
-                value={summary?.pacientes.triaje.Verde ?? 0}
-                label="Triaje verde"
-                color="text-triage-green"
-                ring="border-triage-green/25"
-              />
-              <StatCard
-                loading={loading}
-                value={summary?.pacientes.triaje.Amarillo ?? 0}
-                label="Triaje amarillo"
-                color="text-triage-yellow"
-                ring="border-triage-yellow/30"
-              />
-              <StatCard
-                loading={loading}
-                value={summary?.pacientes.triaje.Rojo ?? 0}
-                label="Triaje rojo"
-                color="text-crisis"
-                ring="border-crisis/20"
-              />
             </div>
-            {!loading && triajeTotal > 0 && (
-              <div className="space-y-2.5 max-w-md">
-                <TriageBar
-                  label="🟢 Verde"
-                  count={summary?.pacientes.triaje.Verde ?? 0}
-                  total={triajeTotal}
-                  color="bg-triage-green"
-                />
-                <TriageBar
-                  label="🟡 Amarillo"
-                  count={summary?.pacientes.triaje.Amarillo ?? 0}
-                  total={triajeTotal}
-                  color="bg-triage-yellow"
-                />
-                <TriageBar
-                  label="🔴 Rojo"
-                  count={summary?.pacientes.triaje.Rojo ?? 0}
-                  total={triajeTotal}
-                  color="bg-crisis"
-                />
+
+            <div className="space-y-4 pt-2 border-t border-border">
+              <div className="flex flex-wrap items-baseline justify-between gap-2">
+                <h4 className="text-sm font-semibold text-gray-800">
+                  En observación — triaje activo
+                </h4>
+                <span className="text-xs text-gray-500 tabular-nums">
+                  {loading ? "—" : summary?.pacientes.en_observacion.total ?? 0} paciente
+                  {(summary?.pacientes.en_observacion.total ?? 0) !== 1 ? "s" : ""}
+                </span>
               </div>
-            )}
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                {TRIAGE_LEVELS.map((level) => {
+                  const styles = TRIAGE_CARD_STYLES[level.id];
+                  return (
+                    <StatCard
+                      key={level.id}
+                      loading={loading}
+                      value={summary?.pacientes.en_observacion.triaje[level.id] ?? 0}
+                      label={level.cardLabel}
+                      sub={level.sub}
+                      color={styles.color}
+                      ring={styles.ring}
+                    />
+                  );
+                })}
+              </div>
+              {!loading && obsTriajeTotal > 0 && (
+                <div className="space-y-2.5 max-w-md">
+                  {TRIAGE_LEVELS.map((level) => {
+                    const styles = TRIAGE_CARD_STYLES[level.id];
+                    return (
+                      <TriageBar
+                        key={level.id}
+                        label={level.barLabel}
+                        sub={level.sub}
+                        count={summary?.pacientes.en_observacion.triaje[level.id] ?? 0}
+                        total={obsTriajeTotal}
+                        color={styles.barColor}
+                      />
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-4 pt-2 border-t border-border">
+              <div className="flex flex-wrap items-baseline justify-between gap-2">
+                <h4 className="text-sm font-semibold text-gray-800">
+                  Dados de alta y traslados
+                </h4>
+                <span className="text-xs text-gray-500 tabular-nums">
+                  {loading ? "—" : summary?.pacientes.dados_alta_traslado.total ?? 0} paciente
+                  {(summary?.pacientes.dados_alta_traslado.total ?? 0) !== 1 ? "s" : ""}
+                </span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                {DESTINOS_ALTA_TRASLADO.map((destino) => (
+                  <StatCard
+                    key={destino}
+                    loading={loading}
+                    value={summary?.pacientes.dados_alta_traslado.por_destino[destino] ?? 0}
+                    label={destino}
+                    color="text-gray-800"
+                    ring="border-border"
+                  />
+                ))}
+              </div>
+            </div>
           </section>
 
           {/* Desaparecidos */}

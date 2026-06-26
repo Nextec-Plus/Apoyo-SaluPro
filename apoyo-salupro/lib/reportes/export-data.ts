@@ -1,6 +1,12 @@
+import { DESTINOS_ALTA_TRASLADO, DESTINO_OTROS } from "@/lib/catastrophe-destinos";
 import { generoDbToUi } from "@/lib/config";
 import { scopeMissingPersonsByOrg } from "@/lib/reportes/missing-persons-scope";
-import { buildReportesSummary, type ReportesSummary } from "@/lib/reportes/summary";
+import {
+  buildReportesSummary,
+  formatReportDate,
+  type ReportPatientRow,
+  type ReportesSummary,
+} from "@/lib/reportes/summary";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database, MissingPerson, MissingPersonStatus } from "@/lib/types/database";
 
@@ -25,8 +31,13 @@ export type ExportPayload = {
   rows: unknown[][];
   /** Solo para resumen: datos para gráficos y KPIs en PDF. */
   summary?: ReportesSummary;
-  /** Solo para resumen PDF: listado de pacientes al final del documento. */
-  patientList?: {
+  /** Solo para resumen PDF: pacientes en observación. */
+  observationPatientList?: {
+    headers: string[];
+    rows: ResumenPatientRow[];
+  };
+  /** Solo para resumen PDF: pacientes dados de alta / trasladados. */
+  dischargedPatientList?: {
     headers: string[];
     rows: ResumenPatientRow[];
   };
@@ -64,6 +75,64 @@ function victimInfo(
   return Array.isArray(info) ? info[0] ?? null : info;
 }
 
+function observationRowToResumen(row: ReportPatientRow): ResumenPatientRow {
+  const triage =
+    row.triage_category === "Verde" ||
+    row.triage_category === "Amarillo" ||
+    row.triage_category === "Rojo"
+      ? row.triage_category
+      : null;
+  return {
+    triage,
+    cells: [
+      row.registration_number ?? "—",
+      row.nombre_completo,
+      row.triage_category ?? "—",
+      row.motivo_principal_consulta?.trim() || "—",
+      formatReportDate(row.fecha_hora_entrada),
+    ],
+  };
+}
+
+function dischargedRowToResumen(row: ReportPatientRow): ResumenPatientRow {
+  return {
+    triage: null,
+    cells: [
+      row.registration_number ?? "—",
+      row.nombre_completo,
+      row.destino,
+      row.estado_destino ?? "—",
+      formatReportDate(row.fecha_hora_entrada),
+    ],
+  };
+}
+
+function buildResumenCsvRows(summary: ReportesSummary): unknown[][] {
+  const obs = summary.pacientes.en_observacion;
+  const alta = summary.pacientes.dados_alta_traslado;
+  const rows: unknown[][] = [
+    ["Pacientes", "Total pacientes", summary.pacientes.total],
+    ["En observación", "Total en observación", obs.total],
+    ["En observación", "Triaje verde", obs.triaje.Verde],
+    ["En observación", "Triaje amarillo", obs.triaje.Amarillo],
+    ["En observación", "Triaje rojo", obs.triaje.Rojo],
+    ["Dados de alta / traslados", "Total", alta.total],
+  ];
+  for (const destino of DESTINOS_ALTA_TRASLADO) {
+    rows.push(["Dados de alta / traslados", destino, alta.por_destino[destino] ?? 0]);
+  }
+  if ((alta.por_destino[DESTINO_OTROS] ?? 0) > 0) {
+    rows.push(["Dados de alta / traslados", DESTINO_OTROS, alta.por_destino[DESTINO_OTROS]]);
+  }
+  rows.push(
+    ["Desaparecidos", "Total registrados", summary.desaparecidos.total],
+    ["Desaparecidos", "Desaparecidos", summary.desaparecidos.desaparecidos],
+    ["Desaparecidos", "Encontrados", summary.desaparecidos.encontrados],
+    ["Desaparecidos", "Fallecidos", summary.desaparecidos.fallecidos],
+  );
+  return rows;
+}
+
 export async function buildExportPayload(
   type: ExportType,
   organizationId: string,
@@ -72,58 +141,27 @@ export async function buildExportPayload(
   if (type === "resumen") {
     const summary = await buildReportesSummary(organizationId);
 
-    const { data: patients, error: patientsError } = await supabase
-      .from("catastrophe_victims")
-      .select(
-        "nombre_completo, sector_comunidad, catastrophe_victim_info(motivo_principal_consulta, fecha_hora_entrada, triage_category)",
-      )
-      .eq("organization_id", organizationId)
-      .order("created_at", { ascending: false });
-
-    if (patientsError) throw new Error(patientsError.message);
-
-    const patientListRows: ResumenPatientRow[] = (patients ?? []).map((v) => {
-      const info = v.catastrophe_victim_info;
-      const row = Array.isArray(info) ? info[0] ?? null : info;
-      const triage = row?.triage_category;
-      const triageColor =
-        triage === "Verde" || triage === "Amarillo" || triage === "Rojo" ? triage : null;
-      return {
-        triage: triageColor,
-        cells: [
-          v.nombre_completo,
-          row?.motivo_principal_consulta?.trim() || "—",
-          formatDate(row?.fecha_hora_entrada),
-          v.sector_comunidad?.trim() || "—",
-        ],
-      };
-    });
-
     return {
       exportType: "resumen",
       title: "Resumen operativo — Apoyo SaluPro",
       subtitle: "Terremoto La Guaira · Control de crisis",
       filenameBase: "reporte-resumen",
       summary,
-      patientList: {
-        headers: ["Nombre", "Sintomatología", "Fecha de ingreso", "Sector"],
-        rows: patientListRows,
+      observationPatientList: {
+        headers: ["Registro", "Nombre", "Triaje", "Motivo", "Ingreso"],
+        rows: summary.pacientes.en_observacion.pacientes.map(observationRowToResumen),
+      },
+      dischargedPatientList: {
+        headers: ["Registro", "Nombre", "Destino", "Estado", "Ingreso"],
+        rows: summary.pacientes.dados_alta_traslado.pacientes.map(dischargedRowToResumen),
       },
       headers: ["Sección", "Indicador", "Cantidad"],
-      rows: [
-        ["Pacientes", "Total pacientes", summary.pacientes.total],
-        ["Pacientes", "Triaje verde", summary.pacientes.triaje.Verde],
-        ["Pacientes", "Triaje amarillo", summary.pacientes.triaje.Amarillo],
-        ["Pacientes", "Triaje rojo", summary.pacientes.triaje.Rojo],
-        ["Desaparecidos", "Total registrados", summary.desaparecidos.total],
-        ["Desaparecidos", "Desaparecidos", summary.desaparecidos.desaparecidos],
-        ["Desaparecidos", "Encontrados", summary.desaparecidos.encontrados],
-        ["Desaparecidos", "Fallecidos", summary.desaparecidos.fallecidos],
-      ],
+      rows: buildResumenCsvRows(summary),
     };
   }
 
   if (type === "pacientes") {
+    const summary = await buildReportesSummary(organizationId);
     const { data, error } = await supabase
       .from("catastrophe_victims")
       .select(
@@ -186,6 +224,7 @@ export async function buildExportPayload(
       title: "Lista de pacientes — Apoyo SaluPro",
       subtitle: `${rows.length} registro(s)`,
       filenameBase: "pacientes",
+      summary,
       headers,
       rows,
     };
