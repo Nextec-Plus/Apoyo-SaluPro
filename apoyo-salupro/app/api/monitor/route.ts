@@ -18,7 +18,7 @@ export async function GET(req: NextRequest) {
 
   const supabase = await createServiceClient()
 
-  // Consulta principal: víctimas + info clínica
+  // Consulta principal: solo víctimas actualmente en atención (excluye Referido y Egreso)
   let query = supabase
     .from('catastrophe_victims')
     .select(`
@@ -31,13 +31,14 @@ export async function GET(req: NextRequest) {
       sector_comunidad,
       ubicacion_actual_refugio,
       notas,
-      catastrophe_victim_info (
+      catastrophe_victim_info!inner (
         triage_category,
         estado_destino,
         motivo_principal_consulta,
         fecha_hora_entrada
       )
     `)
+    .in('catastrophe_victim_info.estado_destino', Array.from(ACTIVE_STATES))
     .order('created_at', { ascending: false })
     .limit(limit)
 
