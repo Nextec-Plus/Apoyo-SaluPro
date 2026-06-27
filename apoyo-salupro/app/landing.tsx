@@ -4,8 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import type { MissingPersonSearchItem } from "@/lib/search/types";
-import { missingPersonsPagedConfig } from "@/lib/search/configs";
-import { SearchProvider } from "@/components/search/SearchProvider";
+import { missingPersonsPagedConfig, type MissingPersonsFilters } from "@/lib/search/configs";
+import { SearchProvider, useSearch } from "@/components/search/SearchProvider";
 import {
   ActiveChips,
   FilterPanel,
@@ -93,7 +93,7 @@ const I = {
 
 export default function Landing() {
   const [menu, setMenu] = useState(false);
-  const [stats, setStats] = useState({ total: 0, busquedas: 0, encontradas: 0 });
+  const [stats, setStats] = useState({ total: 0, busquedas: 0, encontradas: 0, fallecidas: 0 });
   const [statsLoading, setStatsLoading] = useState(true);
 
   useEffect(() => {
@@ -279,25 +279,44 @@ function CountersSection({
   stats,
   loading,
 }: {
-  stats: { total: number; busquedas: number; encontradas: number };
+  stats: { total: number; busquedas: number; encontradas: number; fallecidas: number };
   loading: boolean;
 }) {
+  const { setFilter } = useSearch<MissingPersonSearchItem, MissingPersonsFilters>();
+
+  // Al pulsar un contador: filtra la grilla por ese estado y baja al listado.
+  const go = (estado: string) => {
+    setFilter("estado", estado);
+    if (typeof document !== "undefined") {
+      document.getElementById("casos")?.scrollIntoView({ behavior: "smooth" });
+    }
+  };
+
+  const items: { v: number; label: string; color: string; estado: string }[] = [
+    { v: stats.total, label: "Personas registradas", color: "text-gray-900", estado: "todos" },
+    { v: stats.busquedas, label: "Aún buscadas", color: "text-crisis", estado: "Desaparecido" },
+    { v: stats.encontradas, label: "Encontradas", color: "text-triage-green", estado: "Encontrado" },
+    { v: stats.fallecidas, label: "Fallecidas", color: "text-gray-600", estado: "Confirmado Fallecido" },
+  ];
+
   return (
     <section className="border-b border-border bg-card">
-      <div className="mx-auto max-w-3xl px-4 py-10 grid grid-cols-3 gap-2 sm:gap-4 text-center">
-        {[
-          { v: stats.total, label: "Personas registradas", color: "text-gray-900" },
-          { v: stats.busquedas, label: "Aún buscadas", color: "text-crisis" },
-          { v: stats.encontradas, label: "Encontradas", color: "text-triage-green" },
-        ].map((s) => (
-          <div key={s.label}>
+      <div className="mx-auto max-w-4xl px-4 py-10 grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 text-center">
+        {items.map((s) => (
+          <button
+            key={s.label}
+            type="button"
+            onClick={() => go(s.estado)}
+            className="group rounded-xl px-2 py-2 transition-colors hover:bg-muted/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-ring"
+            aria-label={`Ver ${s.label.toLowerCase()}`}
+          >
             <div className={`font-display text-3xl sm:text-5xl font-extrabold ${s.color}`}>
               {loading ? "—" : <Counter to={s.v} />}
             </div>
-            <div className="mt-1.5 text-[11px] sm:text-xs font-semibold uppercase tracking-widest text-gray-500">
+            <div className="mt-1.5 text-[11px] sm:text-xs font-semibold uppercase tracking-widest text-gray-500 group-hover:text-gray-700">
               {s.label}
             </div>
-          </div>
+          </button>
         ))}
       </div>
     </section>
@@ -361,6 +380,7 @@ function CasosSection() {
 
       {selected && (
         <PersonModal
+          key={selected.id}
           person={selected as PersonModalPerson}
           onClose={() => setSelected(null)}
         />

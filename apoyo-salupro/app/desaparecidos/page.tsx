@@ -232,6 +232,7 @@ export default function DesaparecidosPage() {
 
       {selected && (
         <PersonModal
+          key={selected.id}
           person={selected}
           onClose={() => setSelected(null)}
         />
