@@ -28,12 +28,18 @@ export function PersonModal({
   person,
   onClose,
   manage = false,
+  publicFound = false,
   onChanged,
 }: {
   person: PersonModalPerson;
   onClose: () => void;
   /** Habilita las acciones de gestión (solo vista interna, post-login). */
   manage?: boolean;
+  /**
+   * Habilita la acción pública (sin login) de marcar como encontrada con una
+   * nota opcional. Pensada para las vistas externas (landing, desaparecidos).
+   */
+  publicFound?: boolean;
   /** Se invoca tras un cambio de estado para refrescar el listado/contadores. */
   onChanged?: () => void;
 }) {
@@ -53,6 +59,8 @@ export function PersonModal({
   const [busy, setBusy] = useState<MissingPersonStatus | null>(null);
   const [motivoOpen, setMotivoOpen] = useState(false);
   const [motivo, setMotivo] = useState("");
+  // Nota opcional que el público puede añadir al marcar como encontrada.
+  const [nota, setNota] = useState("");
 
   async function changeEstado(nuevo: MissingPersonStatus) {
     setBusy(nuevo);
@@ -62,6 +70,7 @@ export function PersonModal({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           estado: nuevo,
+          ...(nota.trim() ? { notas: nota.trim() } : {}),
           ...(nuevo === "Confirmado Fallecido" && motivo.trim()
             ? { motivo_fallecimiento: motivo.trim() }
             : {}),
@@ -72,6 +81,7 @@ export function PersonModal({
       setEstado(nuevo);
       setMotivoOpen(false);
       setMotivo("");
+      setNota("");
       toast.success(
         nuevo === "Confirmado Fallecido"
           ? "Persona marcada como fallecida"
@@ -240,6 +250,44 @@ export function PersonModal({
               )}
             </div>
           </div>
+
+          {publicFound && estado !== "Encontrado" && estado !== "Confirmado Fallecido" && (
+            <div className="rounded-xl border border-primary/25 bg-primary-light/30 p-3.5 sm:p-4">
+              <h3 className="font-display text-sm font-bold text-gray-800">¿Ya fue encontrada?</h3>
+              <p className="mt-0.5 text-xs text-gray-500">
+                Si esta persona ya apareció o fue localizada, ayúdanos a actualizar el
+                registro. Puedes añadir una nota si lo deseas.
+              </p>
+              <textarea
+                value={nota}
+                onChange={(e) => setNota(e.target.value)}
+                rows={2}
+                placeholder="Nota (opcional): dónde o cómo fue encontrada…"
+                className="mt-3 w-full rounded-lg border border-border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-ring"
+              />
+              <button
+                type="button"
+                onClick={() => changeEstado("Encontrado")}
+                disabled={busy !== null}
+                className="mt-3 inline-flex items-center justify-center rounded-lg bg-primary hover:bg-primary-dark text-white font-semibold px-4 py-2.5 text-sm transition-colors disabled:opacity-60 w-full sm:w-auto min-h-[44px] sm:min-h-0"
+              >
+                {busy === "Encontrado" ? "Guardando…" : "Marcar como encontrada"}
+              </button>
+            </div>
+          )}
+
+          {publicFound && estado === "Encontrado" && (
+            <div className="rounded-xl border border-triage-green/30 bg-triage-green/5 p-3.5 sm:p-4 flex items-start gap-2.5">
+              <span className="mt-0.5 w-5 h-5 rounded-full bg-triage-green/15 text-triage-green flex items-center justify-center shrink-0">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} className="w-3 h-3">
+                  <path d="M20 6 9 17l-5-5" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </span>
+              <p className="text-sm text-gray-600 leading-snug">
+                Esta persona ya fue marcada como <strong className="text-gray-800">encontrada</strong>. ¡Gracias por mantener el registro al día!
+              </p>
+            </div>
+          )}
 
           {manage && (
             <div className="rounded-xl border border-amber-200 bg-amber-50/60 p-3.5 sm:p-4">

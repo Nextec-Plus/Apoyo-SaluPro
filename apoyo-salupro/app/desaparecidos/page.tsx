@@ -235,6 +235,7 @@ export default function DesaparecidosPage() {
           key={selected.id}
           person={selected}
           onClose={() => setSelected(null)}
+          publicFound
         />
       )}
     </div>

@@ -45,10 +45,10 @@ export async function POST(request: NextRequest, ctx: Ctx) {
     )
   }
 
-  // Verify person exists
-  const { error: fetchError } = await supabase
+  // Verify person exists (y recupera la info actual para no perderla al anotar).
+  const { data: existing, error: fetchError } = await supabase
     .from('missing_persons')
-    .select('id')
+    .select('id, informacion_adicional')
     .eq('id', id)
     .single()
 
@@ -59,7 +59,14 @@ export async function POST(request: NextRequest, ctx: Ctx) {
 
   const update: UpdateMissingPerson = { estado: body.estado }
   if (body.ubicacion_avistamiento) update.ultimo_lugar_visto = body.ubicacion_avistamiento
-  if (body.notas) update.informacion_adicional = body.notas
+  // La nota se añade a la información existente en lugar de reemplazarla, para no
+  // borrar la descripción original del reporte cuando alguien (público) anota.
+  const nota = body.notas?.trim()
+  if (nota) {
+    update.informacion_adicional = existing.informacion_adicional
+      ? `${existing.informacion_adicional}\n\n— ${nota}`
+      : nota
+  }
   if (body.estado === 'Confirmado Fallecido') {
     update.fallecimiento_confirmado = true
     if (body.motivo_fallecimiento) update.motivo_fallecimiento = body.motivo_fallecimiento

@@ -383,6 +383,7 @@ function CasosSection() {
           key={selected.id}
           person={selected as PersonModalPerson}
           onClose={() => setSelected(null)}
+          publicFound
         />
       )}
     </section>
