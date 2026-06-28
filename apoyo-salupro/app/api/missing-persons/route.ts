@@ -57,7 +57,7 @@ export async function GET(request: NextRequest) {
 
   // Columnas ligeras compartidas por los modos paginados (1 imagen por persona).
   const LIST_COLUMNS =
-    'id, organization_id, nombre, apellido, cedula, edad_aproximada, genero, ultimo_lugar_visto, informacion_adicional, estado, motivo_fallecimiento, fallecimiento_confirmado, contacto_nombre, contacto_apellido, contacto_correo, contacto_telefono_nacional, contacto_telefono_internacional, created_at, updated_at, missing_person_images!missing_person_images_missing_person_id_fkey(storage_path)'
+    'id, organization_id, nombre, apellido, cedula, edad_aproximada, genero, ultimo_lugar_visto, informacion_adicional, estado, motivo_fallecimiento, fallecimiento_confirmado, contacto_nombre, contacto_apellido, contacto_correo, contacto_telefono_nacional, contacto_telefono_internacional, created_at, updated_at, has_image, missing_person_images!missing_person_images_missing_person_id_fkey(storage_path)'
 
   // ¿Está disponible la columna acento-insensible `search_index` (migración 006)?
   // Sólo se comprueba cuando hay término de búsqueda libre.
@@ -83,6 +83,8 @@ export async function GET(request: NextRequest) {
       supabase
         .from('missing_persons')
         .select('*, missing_person_images(*)')
+        // Estético: primero quienes tienen foto cargada, luego los más recientes.
+        .order('has_image', { ascending: false })
         .order('created_at', { ascending: false })
         .limit(LEGACY_MAX_ROWS),
     )
@@ -106,6 +108,8 @@ export async function GET(request: NextRequest) {
       supabase
         .from('missing_persons')
         .select(LIST_COLUMNS, { count: 'exact' })
+        // Estético: primero quienes tienen foto cargada, luego los más recientes.
+        .order('has_image', { ascending: false })
         .order('created_at', { ascending: false })
         .order('id', { ascending: false })
         .range(from, to),
@@ -136,20 +140,29 @@ export async function GET(request: NextRequest) {
     supabase
       .from('missing_persons')
       .select(LIST_COLUMNS)
+      // Estético: primero quienes tienen foto cargada, luego los más recientes.
+      .order('has_image', { ascending: false })
       .order('created_at', { ascending: false })
       .order('id', { ascending: false })
       .limit(limit),
   )
 
-  // Cursor compuesto: created_at,id (formato: ISO,cadena-id).
+  // Cursor compuesto: has_image,created_at,id (formato: bool,ISO,cadena-id).
+  // El orden primario es has_image DESC (true antes que false), así que el
+  // keyset debe arrastrar también ese campo para no saltarse filas.
   if (cursor) {
-    const sep = cursor.lastIndexOf(',')
-    if (sep > 0) {
-      const cursorDate = cursor.slice(0, sep)
-      const cursorId = cursor.slice(sep + 1)
-      // (created_at < cursorDate) OR (created_at = cursorDate AND id < cursorId)
+    const firstComma = cursor.indexOf(',')
+    const lastComma = cursor.lastIndexOf(',')
+    if (firstComma > 0 && lastComma > firstComma) {
+      const cursorHasImg = cursor.slice(0, firstComma) // 'true' | 'false'
+      const cursorDate = cursor.slice(firstComma + 1, lastComma)
+      const cursorId = cursor.slice(lastComma + 1)
+      // (has_image < h) OR (has_image = h AND created_at < date) OR
+      // (has_image = h AND created_at = date AND id < id)
       query = query.or(
-        `created_at.lt.${cursorDate},and(created_at.eq.${cursorDate},id.lt.${cursorId})`,
+        `has_image.lt.${cursorHasImg},` +
+          `and(has_image.eq.${cursorHasImg},created_at.lt.${cursorDate}),` +
+          `and(has_image.eq.${cursorHasImg},created_at.eq.${cursorDate},id.lt.${cursorId})`,
       )
     }
   }
@@ -162,13 +175,14 @@ export async function GET(request: NextRequest) {
   const items = (data ?? []) as Array<{
     id: string
     created_at: string
+    has_image: boolean
     [k: string]: unknown
   } & { missing_person_images?: Array<{ storage_path: string }> }>
 
   const last = items[items.length - 1]
   const next_cursor =
     items.length === limit && last
-      ? `${last.created_at},${last.id}`
+      ? `${last.has_image},${last.created_at},${last.id}`
       : null
 
   // Cache pública breve en CDN/edge para absorber picos de 2000 usuarios.
