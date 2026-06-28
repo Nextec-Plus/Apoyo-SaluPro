@@ -36,6 +36,13 @@ yarn-error.log*
 # vercel
 .vercel
 
+# claude code local config
+.claude/
+
+# data dumps de importación (no versionar; pesados)
+datos_completos.csv
+*.dump.csv
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts
