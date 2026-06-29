@@ -92,18 +92,22 @@ export async function syncMissingPersonMatches(
 
     const created = !insertError
 
-    if (person.estado !== 'Encontrado') {
-      const update: { estado: 'Encontrado'; ultimo_lugar_visto?: string } = {
-        estado: 'Encontrado',
-      }
-      if (isReferidoHospitalNotas(victim.notas)) {
-        const { hospital } = parseDestino(victim.notas)
-        update.ultimo_lugar_visto = hospital
-          ? `${REFERIDO_HOSPITAL} — ${hospital}`
-          : REFERIDO_HOSPITAL
-      } else if (victim.ubicacion_actual_refugio?.trim()) {
-        update.ultimo_lugar_visto = victim.ubicacion_actual_refugio.trim()
-      }
+    const locationUpdate: { ultimo_lugar_visto?: string } = {}
+    if (isReferidoHospitalNotas(victim.notas)) {
+      const { hospital } = parseDestino(victim.notas)
+      locationUpdate.ultimo_lugar_visto = hospital
+        ? `${REFERIDO_HOSPITAL} — ${hospital}`
+        : REFERIDO_HOSPITAL
+    } else if (victim.ubicacion_actual_refugio?.trim()) {
+      locationUpdate.ultimo_lugar_visto = victim.ubicacion_actual_refugio.trim()
+    }
+
+    const needsEstadoUpdate = person.estado !== 'Encontrado'
+    const hasLocationUpdate = locationUpdate.ultimo_lugar_visto !== undefined
+
+    if (needsEstadoUpdate || hasLocationUpdate) {
+      const update: { estado?: 'Encontrado'; ultimo_lugar_visto?: string } = { ...locationUpdate }
+      if (needsEstadoUpdate) update.estado = 'Encontrado'
       await supabase.from('missing_persons').update(update).eq('id', person.id)
     }
 

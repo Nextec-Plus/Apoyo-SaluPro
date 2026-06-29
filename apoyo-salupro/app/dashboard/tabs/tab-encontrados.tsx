@@ -59,6 +59,11 @@ export function TabEncontrados({
     setLoading(true);
     setError("");
     try {
+      // Retroactively sync hospital locations for existing matches before loading
+      fetch(`/api/missing-persons/sync-locations?organization_id=${encodeURIComponent(orgId)}`, {
+        method: "POST",
+      }).catch(() => {});
+
       const res = await fetch(
         `/api/missing-persons/found?organization_id=${encodeURIComponent(orgId)}`,
       );

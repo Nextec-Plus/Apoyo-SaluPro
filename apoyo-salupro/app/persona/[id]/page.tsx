@@ -8,6 +8,7 @@ import {
   STATUS_META,
 } from "@/lib/missing-persons";
 import { StatusActions } from "./status-actions";
+import { isReferidoHospitalNotas, parseDestino } from "@/lib/catastrophe-destinos";
 
 export const dynamic = "force-dynamic";
 
@@ -99,7 +100,22 @@ export default async function PersonaPage({
               {p.nombre} {p.apellido}
             </h1>
             {p.ultimo_lugar_visto && (
-              <p className="mt-2 text-gray-600">Visto por última vez en {p.ultimo_lugar_visto}</p>
+              <p className="mt-2 text-gray-600">
+                {p.estado === "Encontrado" ? (
+                  isReferidoHospitalNotas(p.ultimo_lugar_visto) ? (
+                    <>
+                      Se encuentra en{" "}
+                      <span className="font-semibold text-blue-700">
+                        🏥 {parseDestino(p.ultimo_lugar_visto).hospital || "Hospital"}
+                      </span>
+                    </>
+                  ) : (
+                    <>Se encuentra en {p.ultimo_lugar_visto}</>
+                  )
+                ) : (
+                  <>Visto por última vez en {p.ultimo_lugar_visto}</>
+                )}
+              </p>
             )}
 
             <div className="mt-6 rounded-2xl border border-border bg-card p-6">
@@ -108,7 +124,14 @@ export default async function PersonaPage({
                 <Row label="Cédula" value={p.cedula} />
                 <Row label="Edad aproximada" value={p.edad_aproximada ? `${p.edad_aproximada} años` : null} />
                 <Row label="Género" value={p.genero} />
-                <Row label="Último lugar visto" value={p.ultimo_lugar_visto} />
+                <Row
+                  label={p.estado === "Encontrado" ? "Se encuentra en" : "Último lugar visto"}
+                  value={
+                    p.estado === "Encontrado" && isReferidoHospitalNotas(p.ultimo_lugar_visto)
+                      ? `🏥 ${parseDestino(p.ultimo_lugar_visto).hospital || "Hospital"}`
+                      : p.ultimo_lugar_visto
+                  }
+                />
               </dl>
               {p.informacion_adicional && (
                 <p className="mt-4 text-sm text-gray-700 leading-relaxed bg-muted/60 rounded-lg p-4">

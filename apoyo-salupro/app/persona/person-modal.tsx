@@ -10,6 +10,7 @@ import {
 import type { MissingPersonSearchItem } from "@/lib/search/types";
 import type { MissingPersonStatus } from "@/lib/types/database";
 import { useToast } from "@/components/toast-provider";
+import { isReferidoHospitalNotas, parseDestino } from "@/lib/catastrophe-destinos";
 
 function Field({ label, value }: { label: string; value?: string | number | null }) {
   if (value === null || value === undefined || value === "") return null;
@@ -186,7 +187,20 @@ export function PersonModal({
                 )
               : person.ultimo_lugar_visto && (
                   <p className="mt-1 text-sm text-gray-600 leading-snug">
-                    Visto por última vez en {person.ultimo_lugar_visto}
+                    {estado === "Encontrado" ? (
+                      isReferidoHospitalNotas(person.ultimo_lugar_visto) ? (
+                        <>
+                          Se encuentra en{" "}
+                          <span className="inline-flex items-center gap-1 font-semibold text-blue-700">
+                            🏥 {parseDestino(person.ultimo_lugar_visto).hospital || "Hospital"}
+                          </span>
+                        </>
+                      ) : (
+                        <>Se encuentra en {person.ultimo_lugar_visto}</>
+                      )
+                    ) : (
+                      <>Visto por última vez en {person.ultimo_lugar_visto}</>
+                    )}
                   </p>
                 )}
 
@@ -206,7 +220,14 @@ export function PersonModal({
               {esFallecido ? (
                 <Field label="Motivo de fallecimiento" value={person.motivo_fallecimiento} />
               ) : (
-                <Field label="Último lugar" value={person.ultimo_lugar_visto} />
+                <Field
+                  label={estado === "Encontrado" ? "Se encuentra en" : "Último lugar"}
+                  value={
+                    estado === "Encontrado" && isReferidoHospitalNotas(person.ultimo_lugar_visto)
+                      ? `🏥 ${parseDestino(person.ultimo_lugar_visto).hospital || "Hospital"}`
+                      : person.ultimo_lugar_visto
+                  }
+                />
               )}
             </dl>
             {person.informacion_adicional && (
