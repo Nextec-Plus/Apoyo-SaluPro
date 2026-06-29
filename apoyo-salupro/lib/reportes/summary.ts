@@ -105,7 +105,6 @@ export async function buildReportesSummary(
 
   const [
     pacientesTotalRes,
-    victimsRes,
     mpTotalRes,
     mpDesaparecidoRes,
     mpEncontradoRes,
@@ -114,12 +113,6 @@ export async function buildReportesSummary(
     supabase
       .from("catastrophe_victims")
       .select("*", { count: "exact", head: true })
-      .eq("organization_id", organization_id),
-    supabase
-      .from("catastrophe_victims")
-      .select(
-        "id, registration_number, nombre_completo, notas, catastrophe_victim_info(triage_category, estado_destino, motivo_principal_consulta, fecha_hora_entrada)",
-      )
       .eq("organization_id", organization_id),
     scopeMissingPersonsByOrg(
       supabase.from("missing_persons").select("*", { count: "exact", head: true }),
@@ -151,8 +144,24 @@ export async function buildReportesSummary(
   if (pacientesTotalRes.error) {
     throw new Error(pacientesTotalRes.error.message);
   }
-  if (victimsRes.error) {
-    throw new Error(victimsRes.error.message);
+
+  // Víctimas paginadas: PostgREST corta en 1000 filas por petición, así que
+  // sin paginar el desglose no cuadraba con el total cuando hay >1000 pacientes.
+  const victims: VictimRow[] = [];
+  const VICTIMS_PAGE = 1000;
+  for (let from = 0; ; from += VICTIMS_PAGE) {
+    const { data, error } = await supabase
+      .from("catastrophe_victims")
+      .select(
+        "id, registration_number, nombre_completo, notas, catastrophe_victim_info(triage_category, estado_destino, motivo_principal_consulta, fecha_hora_entrada)",
+      )
+      .eq("organization_id", organization_id)
+      .order("created_at", { ascending: false })
+      .range(from, from + VICTIMS_PAGE - 1);
+    if (error) throw new Error(error.message);
+    if (!data || data.length === 0) break;
+    victims.push(...(data as VictimRow[]));
+    if (data.length < VICTIMS_PAGE) break;
   }
 
   const triaje = emptyTriaje();
@@ -163,7 +172,7 @@ export async function buildReportesSummary(
   const dischargedRows: ReportPatientRow[] = [];
   const localizadosRows: ReportPatientRow[] = [];
 
-  for (const v of (victimsRes.data ?? []) as VictimRow[]) {
+  for (const v of victims) {
     const info = victimInfo(v);
     const estado_destino = info?.estado_destino ?? null;
     const estadoClasificacion = estadoParaClasificacion(v.notas, estado_destino);

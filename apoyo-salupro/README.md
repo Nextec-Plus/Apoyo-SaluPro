@@ -53,10 +53,10 @@ GET https://apoyo.salu.pro/api/export?dataset=<dataset>&format=<csv|json>
 Toda petición requiere un token entregado por Apoyo SaluPro, en la cabecera:
 
 ```
-X-API-Key: <TU_TOKEN>
+X-API-Key: <TOKEN>
 ```
 
-(También se acepta `Authorization: Bearer <TU_TOKEN>`.) Sin token válido se responde `401`.
+(También se acepta `Authorization: Bearer <TOKEN>`.) Sin token válido se responde `401`.
 
 ### Datasets disponibles
 
@@ -76,12 +76,12 @@ X-API-Key: <TU_TOKEN>
 
 ```bash
 # CSV de personas desaparecidas
-curl -H "X-API-Key: <TU_TOKEN>" \
+curl -H "X-API-Key: <TOKEN>" \
   "https://apoyo.salu.pro/api/export?dataset=personas-desaparecidas&format=csv" \
   -o personas-desaparecidas.csv
 
 # JSON de pacientes
-curl -H "X-API-Key: <TU_TOKEN>" \
+curl -H "X-API-Key: <TOKEN>" \
   "https://apoyo.salu.pro/api/export?dataset=pacientes&format=json" \
   -o pacientes.json
 ```
@@ -92,7 +92,7 @@ import requests
 r = requests.get(
     "https://apoyo.salu.pro/api/export",
     params={"dataset": "personas-desaparecidas", "format": "json"},
-    headers={"X-API-Key": "<TU_TOKEN>"},
+    headers={"X-API-Key": "<TOKEN>"},
     timeout=180,
 )
 data = r.json()
