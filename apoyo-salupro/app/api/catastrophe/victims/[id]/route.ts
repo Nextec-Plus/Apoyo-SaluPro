@@ -58,6 +58,7 @@ export async function PATCH(
     nombre_completo: data.nombre_completo,
     cedula: data.cedula,
     ubicacion_actual_refugio: data.ubicacion_actual_refugio,
+    notas: data.notas,
   })
 
   return Response.json({ data, found_matches, error: null })

@@ -10,6 +10,24 @@ import {
 import type { MissingPersonSearchItem } from "@/lib/search/types";
 import type { MissingPersonStatus } from "@/lib/types/database";
 import { useToast } from "@/components/toast-provider";
+import {
+  isReferidoHospitalNotas,
+  parseDestino,
+  REFERIDO_HOSPITAL,
+  OBSERVACION_MODULO_MOVIL,
+} from "@/lib/catastrophe-destinos";
+
+function formatFoundLocation(lugar: string | null | undefined): { icon: string; text: string } {
+  if (!lugar) return { icon: "", text: "" };
+  if (isReferidoHospitalNotas(lugar)) {
+    const { hospital } = parseDestino(lugar);
+    return { icon: "🏥", text: hospital || "Hospital" };
+  }
+  if (lugar === OBSERVACION_MODULO_MOVIL) return { icon: "🩺", text: "En observación en módulo móvil" };
+  if (lugar === "Dado de alta (Ambulatorio)") return { icon: "✅", text: "Dado de alta (Ambulatorio)" };
+  if (lugar === "Trasladado a Refugio Oficial") return { icon: "🏠", text: "Trasladado a Refugio Oficial" };
+  return { icon: "📍", text: lugar };
+}
 
 function Field({ label, value }: { label: string; value?: string | number | null }) {
   if (value === null || value === undefined || value === "") return null;
@@ -186,7 +204,20 @@ export function PersonModal({
                 )
               : person.ultimo_lugar_visto && (
                   <p className="mt-1 text-sm text-gray-600 leading-snug">
-                    Visto por última vez en {person.ultimo_lugar_visto}
+                    {estado === "Encontrado" ? (() => {
+                      const { icon, text } = formatFoundLocation(person.ultimo_lugar_visto);
+                      return (
+                        <>
+                          {icon === "✅" || icon === "🏠" ? (
+                            <span className="font-medium">{icon} {text}</span>
+                          ) : (
+                            <>Se encuentra en <span className="font-semibold">{icon} {text}</span></>
+                          )}
+                        </>
+                      );
+                    })() : (
+                      <>Visto por última vez en {person.ultimo_lugar_visto}</>
+                    )}
                   </p>
                 )}
 
@@ -205,9 +236,14 @@ export function PersonModal({
               <Field label="Género" value={person.genero} />
               {esFallecido ? (
                 <Field label="Motivo de fallecimiento" value={person.motivo_fallecimiento} />
-              ) : (
-                <Field label="Último lugar" value={person.ultimo_lugar_visto} />
-              )}
+              ) : (() => {
+                  if (estado === "Encontrado" && person.ultimo_lugar_visto) {
+                    const { icon, text } = formatFoundLocation(person.ultimo_lugar_visto);
+                    return <Field label="Ubicación actual" value={`${icon} ${text}`.trim()} />;
+                  }
+                  return <Field label="Último lugar" value={person.ultimo_lugar_visto} />;
+                })()
+              }
             </dl>
             {person.informacion_adicional && (
               <p className="mt-3 pt-3 text-sm text-gray-700 leading-relaxed border-t border-border">

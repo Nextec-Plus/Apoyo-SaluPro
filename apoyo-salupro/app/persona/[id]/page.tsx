@@ -8,6 +8,23 @@ import {
   STATUS_META,
 } from "@/lib/missing-persons";
 import { StatusActions } from "./status-actions";
+import {
+  isReferidoHospitalNotas,
+  parseDestino,
+  OBSERVACION_MODULO_MOVIL,
+} from "@/lib/catastrophe-destinos";
+
+function formatFoundLocation(lugar: string | null | undefined): { icon: string; text: string } {
+  if (!lugar) return { icon: "", text: "" };
+  if (isReferidoHospitalNotas(lugar)) {
+    const { hospital } = parseDestino(lugar);
+    return { icon: "🏥", text: hospital || "Hospital" };
+  }
+  if (lugar === OBSERVACION_MODULO_MOVIL) return { icon: "🩺", text: "En observación en módulo móvil" };
+  if (lugar === "Dado de alta (Ambulatorio)") return { icon: "✅", text: "Dado de alta (Ambulatorio)" };
+  if (lugar === "Trasladado a Refugio Oficial") return { icon: "🏠", text: "Trasladado a Refugio Oficial" };
+  return { icon: "📍", text: lugar };
+}
 
 export const dynamic = "force-dynamic";
 
@@ -99,7 +116,17 @@ export default async function PersonaPage({
               {p.nombre} {p.apellido}
             </h1>
             {p.ultimo_lugar_visto && (
-              <p className="mt-2 text-gray-600">Visto por última vez en {p.ultimo_lugar_visto}</p>
+              <p className="mt-2 text-gray-600">
+                {p.estado === "Encontrado" ? (() => {
+                  const { icon, text } = formatFoundLocation(p.ultimo_lugar_visto);
+                  const isStatusOnly = icon === "✅" || icon === "🏠";
+                  return isStatusOnly
+                    ? <span className="font-medium">{icon} {text}</span>
+                    : <><span>Se encuentra en </span><span className="font-semibold">{icon} {text}</span></>;
+                })() : (
+                  <>Visto por última vez en {p.ultimo_lugar_visto}</>
+                )}
+              </p>
             )}
 
             <div className="mt-6 rounded-2xl border border-border bg-card p-6">
@@ -108,7 +135,12 @@ export default async function PersonaPage({
                 <Row label="Cédula" value={p.cedula} />
                 <Row label="Edad aproximada" value={p.edad_aproximada ? `${p.edad_aproximada} años` : null} />
                 <Row label="Género" value={p.genero} />
-                <Row label="Último lugar visto" value={p.ultimo_lugar_visto} />
+                {p.estado === "Encontrado" && p.ultimo_lugar_visto ? (() => {
+                  const { icon, text } = formatFoundLocation(p.ultimo_lugar_visto);
+                  return <Row label="Ubicación actual" value={`${icon} ${text}`.trim()} />;
+                })() : (
+                  <Row label="Último lugar visto" value={p.ultimo_lugar_visto} />
+                )}
               </dl>
               {p.informacion_adicional && (
                 <p className="mt-4 text-sm text-gray-700 leading-relaxed bg-muted/60 rounded-lg p-4">
