@@ -1,6 +1,6 @@
 import type { NextRequest } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
-import { isReferidoHospitalNotas, parseDestino, REFERIDO_HOSPITAL } from '@/lib/catastrophe-destinos'
+import { isReferidoHospitalNotas, parseDestino, REFERIDO_HOSPITAL, DESTINOS } from '@/lib/catastrophe-destinos'
 
 export async function POST(request: NextRequest) {
   const supabase = await createServiceClient()
@@ -41,10 +41,18 @@ export async function POST(request: NextRequest) {
     if (organization_id && victim.organization_id !== organization_id) continue
 
     let newLocation: string | undefined
-    if (isReferidoHospitalNotas(victim.notas)) {
-      const { hospital } = parseDestino(victim.notas)
-      newLocation = hospital ? `${REFERIDO_HOSPITAL} — ${hospital}` : REFERIDO_HOSPITAL
-    } else if (victim.ubicacion_actual_refugio?.trim()) {
+    if (victim.notas?.trim()) {
+      if (isReferidoHospitalNotas(victim.notas)) {
+        const { hospital } = parseDestino(victim.notas)
+        newLocation = hospital ? `${REFERIDO_HOSPITAL} — ${hospital}` : REFERIDO_HOSPITAL
+      } else {
+        const { destino } = parseDestino(victim.notas)
+        if ((DESTINOS as readonly string[]).includes(destino)) {
+          newLocation = destino
+        }
+      }
+    }
+    if (!newLocation && victim.ubicacion_actual_refugio?.trim()) {
       newLocation = victim.ubicacion_actual_refugio.trim()
     }
 

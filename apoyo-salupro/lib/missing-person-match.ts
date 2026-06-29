@@ -1,6 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database, MissingPersonMatchType } from '@/lib/types/database'
-import { isReferidoHospitalNotas, parseDestino, REFERIDO_HOSPITAL } from '@/lib/catastrophe-destinos'
+import { isReferidoHospitalNotas, parseDestino, REFERIDO_HOSPITAL, DESTINOS } from '@/lib/catastrophe-destinos'
 
 type ServiceClient = SupabaseClient<Database>
 
@@ -93,12 +93,20 @@ export async function syncMissingPersonMatches(
     const created = !insertError
 
     const locationUpdate: { ultimo_lugar_visto?: string } = {}
-    if (isReferidoHospitalNotas(victim.notas)) {
-      const { hospital } = parseDestino(victim.notas)
-      locationUpdate.ultimo_lugar_visto = hospital
-        ? `${REFERIDO_HOSPITAL} — ${hospital}`
-        : REFERIDO_HOSPITAL
-    } else if (victim.ubicacion_actual_refugio?.trim()) {
+    if (victim.notas?.trim()) {
+      if (isReferidoHospitalNotas(victim.notas)) {
+        const { hospital } = parseDestino(victim.notas)
+        locationUpdate.ultimo_lugar_visto = hospital
+          ? `${REFERIDO_HOSPITAL} — ${hospital}`
+          : REFERIDO_HOSPITAL
+      } else {
+        const { destino } = parseDestino(victim.notas)
+        if ((DESTINOS as readonly string[]).includes(destino)) {
+          locationUpdate.ultimo_lugar_visto = destino
+        }
+      }
+    }
+    if (!locationUpdate.ultimo_lugar_visto && victim.ubicacion_actual_refugio?.trim()) {
       locationUpdate.ultimo_lugar_visto = victim.ubicacion_actual_refugio.trim()
     }
 
