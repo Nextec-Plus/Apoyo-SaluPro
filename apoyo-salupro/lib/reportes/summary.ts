@@ -161,6 +161,7 @@ export async function buildReportesSummary(
   const porDestino = emptyPorDestino();
   const observationRows: ReportPatientRow[] = [];
   const dischargedRows: ReportPatientRow[] = [];
+  const localizadosRows: ReportPatientRow[] = [];
 
   for (const v of (victimsRes.data ?? []) as VictimRow[]) {
     const info = victimInfo(v);
@@ -197,6 +198,10 @@ export async function buildReportesSummary(
       });
       const bucket = bucketDestinoAltaTraslado(v.notas, estadoClasificacion);
       porDestino[bucket] = (porDestino[bucket] ?? 0) + 1;
+    } else {
+      // Ni observación ni alta/traslado: p. ej. importados "localizada / a salvo"
+      // sin ficha de triaje. Se listan aparte para reconciliar el total.
+      localizadosRows.push(row);
     }
   }
 
@@ -214,6 +219,10 @@ export async function buildReportesSummary(
         total: dischargedRows.length,
         por_destino: porDestino,
         pacientes: sortDischargedPatients(dischargedRows),
+      },
+      localizados: {
+        total: localizadosRows.length,
+        pacientes: sortDischargedPatients(localizadosRows),
       },
     },
     desaparecidos: {

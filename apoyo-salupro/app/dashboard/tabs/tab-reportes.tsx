@@ -250,6 +250,14 @@ export function TabReportes() {
                 color="text-primary"
                 ring="border-primary/25"
               />
+              <StatCard
+                loading={loading}
+                value={summary?.pacientes.localizados.total ?? 0}
+                label="Localizados / a salvo"
+                sub="Sin ficha de triaje"
+                color="text-gray-700"
+                ring="border-gray-200"
+              />
             </div>
 
             <div className="space-y-4 pt-2 border-t border-border">

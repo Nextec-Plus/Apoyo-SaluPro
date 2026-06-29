@@ -28,6 +28,12 @@ export type ReportesSummary = {
       por_destino: Record<string, number>;
       pacientes: ReportPatientRow[];
     };
+    /** Pacientes que no caen en observación ni alta/traslado (p. ej. importados
+     *  "localizada / a salvo" sin ficha de triaje). Reconcilian el total. */
+    localizados: {
+      total: number;
+      pacientes: ReportPatientRow[];
+    };
   };
   desaparecidos: {
     total: number;

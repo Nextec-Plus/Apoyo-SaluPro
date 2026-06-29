@@ -41,6 +41,11 @@ export type ExportPayload = {
     headers: string[];
     rows: ResumenPatientRow[];
   };
+  /** Solo para resumen PDF: localizados / a salvo sin ficha de triaje. */
+  localizadosPatientList?: {
+    headers: string[];
+    rows: ResumenPatientRow[];
+  };
 };
 
 function formatDate(iso: string | null | undefined): string {
@@ -107,6 +112,17 @@ function dischargedRowToResumen(row: ReportPatientRow): ResumenPatientRow {
   };
 }
 
+function localizadoRowToResumen(row: ReportPatientRow): ResumenPatientRow {
+  return {
+    triage: null,
+    cells: [
+      row.registration_number ?? "—",
+      row.nombre_completo,
+      row.destino?.replace(/\s+/g, " ").trim() || "—",
+    ],
+  };
+}
+
 function buildResumenCsvRows(summary: ReportesSummary): unknown[][] {
   const obs = summary.pacientes.en_observacion;
   const alta = summary.pacientes.dados_alta_traslado;
@@ -124,6 +140,11 @@ function buildResumenCsvRows(summary: ReportesSummary): unknown[][] {
   if ((alta.por_destino[DESTINO_OTROS] ?? 0) > 0) {
     rows.push(["Dados de alta / traslados", DESTINO_OTROS, alta.por_destino[DESTINO_OTROS]]);
   }
+  rows.push([
+    "Localizados / a salvo",
+    "Total (sin ficha de triaje)",
+    summary.pacientes.localizados.total,
+  ]);
   rows.push(
     ["Desaparecidos", "Total registrados", summary.desaparecidos.total],
     ["Desaparecidos", "Desaparecidos", summary.desaparecidos.desaparecidos],
@@ -154,6 +175,10 @@ export async function buildExportPayload(
       dischargedPatientList: {
         headers: ["Registro", "Nombre", "Destino", "Estado", "Ingreso"],
         rows: summary.pacientes.dados_alta_traslado.pacientes.map(dischargedRowToResumen),
+      },
+      localizadosPatientList: {
+        headers: ["Registro", "Nombre", "Estado / ubicación"],
+        rows: summary.pacientes.localizados.pacientes.map(localizadoRowToResumen),
       },
       headers: ["Sección", "Indicador", "Cantidad"],
       rows: buildResumenCsvRows(summary),

@@ -344,6 +344,18 @@ function buildResumenPdf(payload: ExportPayload): Buffer {
     );
   }
 
+  y = ensureSpace(doc, y, 40, margin);
+  if (payload.localizadosPatientList && payload.localizadosPatientList.rows.length > 0) {
+    y = drawCohortPatientTable(
+      doc,
+      y,
+      margin,
+      "Localizados / a salvo (sin ficha de triaje)",
+      payload.localizadosPatientList,
+      false,
+    );
+  }
+
   y = ensureSpace(doc, y, 60, margin);
   doc.setFontSize(11);
   doc.setTextColor(31, 41, 55);
