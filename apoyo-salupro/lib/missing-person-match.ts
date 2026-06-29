@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database, MissingPersonMatchType } from '@/lib/types/database'
+import { isReferidoHospitalNotas, parseDestino, REFERIDO_HOSPITAL } from '@/lib/catastrophe-destinos'
 
 type ServiceClient = SupabaseClient<Database>
 
@@ -44,6 +45,7 @@ export async function syncMissingPersonMatches(
     nombre_completo: string
     cedula: string | null
     ubicacion_actual_refugio?: string | null
+    notas?: string | null
   },
 ): Promise<FoundMatchResult[]> {
   const normCedula = normalizeCedula(victim.cedula)
@@ -94,7 +96,12 @@ export async function syncMissingPersonMatches(
       const update: { estado: 'Encontrado'; ultimo_lugar_visto?: string } = {
         estado: 'Encontrado',
       }
-      if (victim.ubicacion_actual_refugio?.trim()) {
+      if (isReferidoHospitalNotas(victim.notas)) {
+        const { hospital } = parseDestino(victim.notas)
+        update.ultimo_lugar_visto = hospital
+          ? `${REFERIDO_HOSPITAL} — ${hospital}`
+          : REFERIDO_HOSPITAL
+      } else if (victim.ubicacion_actual_refugio?.trim()) {
         update.ultimo_lugar_visto = victim.ubicacion_actual_refugio.trim()
       }
       await supabase.from('missing_persons').update(update).eq('id', person.id)

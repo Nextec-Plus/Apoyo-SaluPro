@@ -29,6 +29,7 @@ export async function GET(request: NextRequest) {
         cedula,
         registration_number,
         ubicacion_actual_refugio,
+        notas,
         organization_id
       )
     `,

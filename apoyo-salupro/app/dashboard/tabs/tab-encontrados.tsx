@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { getClientOrganizationId } from "@/lib/config";
 import type { MissingPersonMatchType } from "@/lib/types/database";
 import { FOUND_MATCHES_UPDATED_EVENT } from "@/lib/events";
+import { isReferidoHospitalNotas, parseDestino } from "@/lib/catastrophe-destinos";
 
 type FoundRow = {
   id: string;
@@ -25,6 +26,7 @@ type FoundRow = {
     cedula: string | null;
     registration_number: string;
     ubicacion_actual_refugio: string | null;
+    notas: string | null;
   } | null;
 };
 
@@ -143,8 +145,23 @@ export function TabEncontrados({
                         {MATCH_LABEL[row.match_type]}
                       </span>
                     </td>
-                    <td className="px-3 py-3 align-top text-gray-600 text-xs max-w-[140px]">
-                      {victim.ubicacion_actual_refugio ?? "—"}
+                    <td className="px-3 py-3 align-top text-xs max-w-[160px]">
+                      {isReferidoHospitalNotas(victim.notas) ? (
+                        <span className="inline-flex flex-col gap-0.5">
+                          <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 text-blue-700 font-semibold px-2 py-0.5 text-[10px] whitespace-nowrap">
+                            🏥 Hospital
+                          </span>
+                          {parseDestino(victim.notas).hospital && (
+                            <span className="text-gray-700 leading-tight">
+                              {parseDestino(victim.notas).hospital}
+                            </span>
+                          )}
+                        </span>
+                      ) : (
+                        <span className="text-gray-600">
+                          {victim.ubicacion_actual_refugio ?? "—"}
+                        </span>
+                      )}
                     </td>
                     <td className="px-3 py-3 align-top text-xs text-gray-600">
                       <p>{person.contacto_nombre} {person.contacto_apellido}</p>
