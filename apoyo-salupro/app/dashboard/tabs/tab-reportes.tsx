@@ -234,7 +234,7 @@ export function TabReportes() {
           {/* Pacientes */}
           <section className="space-y-6">
             <h3 className="text-sm font-bold text-gray-800">Pacientes registrados</h3>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 max-w-lg">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 max-w-3xl">
               <StatCard
                 loading={loading}
                 value={summary?.pacientes.total ?? 0}
@@ -245,10 +245,18 @@ export function TabReportes() {
               <StatCard
                 loading={loading}
                 value={summary?.pacientes.en_observacion.total ?? 0}
-                label="Triaje activo"
-                sub="En observación en módulo móvil"
+                label="En observación"
+                sub="Triaje activo"
                 color="text-primary"
                 ring="border-primary/25"
+              />
+              <StatCard
+                loading={loading}
+                value={summary?.pacientes.dados_alta_traslado.total ?? 0}
+                label="Alta / traslado"
+                sub="Atendidos y egresados"
+                color="text-triage-green"
+                ring="border-triage-green/25"
               />
               <StatCard
                 loading={loading}
@@ -259,6 +267,18 @@ export function TabReportes() {
                 ring="border-gray-200"
               />
             </div>
+            {!loading && summary && (
+              <p className="text-xs text-gray-500 -mt-2">
+                Total{" "}
+                <span className="font-semibold tabular-nums text-gray-700">
+                  {summary.pacientes.total.toLocaleString("es-VE")}
+                </span>{" "}
+                = En observación{" "}
+                <span className="tabular-nums">{summary.pacientes.en_observacion.total}</span> + Alta/traslado{" "}
+                <span className="tabular-nums">{summary.pacientes.dados_alta_traslado.total}</span> + Localizados{" "}
+                <span className="tabular-nums">{summary.pacientes.localizados.total}</span>
+              </p>
+            )}
 
             <div className="space-y-4 pt-2 border-t border-border">
               <div className="flex flex-wrap items-baseline justify-between gap-2">

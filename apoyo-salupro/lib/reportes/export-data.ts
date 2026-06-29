@@ -187,15 +187,41 @@ export async function buildExportPayload(
 
   if (type === "pacientes") {
     const summary = await buildReportesSummary(organizationId);
-    const { data, error } = await supabase
-      .from("catastrophe_victims")
-      .select(
-        "registration_number, nombre_completo, cedula, edad, genero, telefono_contacto, sector_comunidad, nombre_edificio_casa, numero_apartamento_casa, ubicacion_actual_refugio, notas, created_at, catastrophe_victim_info(triage_category, estado_destino, motivo_principal_consulta, condiciones_preexistentes, alergias, tratamiento_medicamentos, fecha_hora_entrada)",
-      )
-      .eq("organization_id", organizationId)
-      .order("created_at", { ascending: false });
 
-    if (error) throw new Error(error.message);
+    // Paginado: PostgREST corta en 1000 filas por petición; sin esto el export
+    // dejaba fuera a los pacientes a partir del 1000.
+    type PacienteExportRow = {
+      registration_number: string | null;
+      nombre_completo: string;
+      cedula: string | null;
+      edad: number | null;
+      genero: string | null;
+      telefono_contacto: string | null;
+      sector_comunidad: string | null;
+      nombre_edificio_casa: string | null;
+      numero_apartamento_casa: string | null;
+      ubicacion_actual_refugio: string | null;
+      notas: string | null;
+      created_at: string;
+      catastrophe_victim_info: Parameters<typeof victimInfo>[0];
+    };
+
+    const data: PacienteExportRow[] = [];
+    const PAGE = 500;
+    for (let from = 0; ; from += PAGE) {
+      const page = await supabase
+        .from("catastrophe_victims")
+        .select(
+          "registration_number, nombre_completo, cedula, edad, genero, telefono_contacto, sector_comunidad, nombre_edificio_casa, numero_apartamento_casa, ubicacion_actual_refugio, notas, created_at, catastrophe_victim_info(triage_category, estado_destino, motivo_principal_consulta, condiciones_preexistentes, alergias, tratamiento_medicamentos, fecha_hora_entrada)",
+        )
+        .eq("organization_id", organizationId)
+        .order("created_at", { ascending: false })
+        .range(from, from + PAGE - 1);
+      if (page.error) throw new Error(page.error.message);
+      if (!page.data || page.data.length === 0) break;
+      data.push(...(page.data as unknown as PacienteExportRow[]));
+      if (page.data.length < PAGE) break;
+    }
 
     const headers = [
       "N° Registro",

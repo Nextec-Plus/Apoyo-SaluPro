@@ -258,8 +258,27 @@ function buildResumenPdf(payload: ExportPayload): Buffer {
         value: summary.pacientes.en_observacion.total,
         color: PRIMARY,
       },
+      {
+        label: "Alta / traslado",
+        value: summary.pacientes.dados_alta_traslado.total,
+        color: GREEN,
+      },
+      {
+        label: "Localizados / a salvo",
+        value: summary.pacientes.localizados.total,
+        color: GRAY,
+      },
     ],
   });
+
+  doc.setFontSize(8);
+  doc.setTextColor(107, 114, 128);
+  doc.text(
+    `Total ${summary.pacientes.total} = En observación ${summary.pacientes.en_observacion.total} + Alta/traslado ${summary.pacientes.dados_alta_traslado.total} + Localizados ${summary.pacientes.localizados.total}`,
+    margin,
+    y,
+  );
+  y += 5;
 
   y = ensureSpace(doc, y, 50, margin);
   doc.setFontSize(10);
