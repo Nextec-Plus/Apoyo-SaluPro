@@ -76,6 +76,16 @@ export function drawKpiRow(
   const { x, y, width, items } = opts;
   const colW = width / items.length;
   const hasSub = items.some((item) => item.sub);
+  const labelLineH = 3;
+  const innerW = colW - 4; // padding para no tocar la columna vecina
+
+  // Pre-calcular las líneas de cada etiqueta (envueltas, sin truncar) para
+  // alinear todas las columnas a la misma altura.
+  doc.setFontSize(7);
+  const wrapped = items.map((item) =>
+    doc.splitTextToSize(item.label.toUpperCase(), innerW) as string[],
+  );
+  const maxLabelLines = Math.max(1, ...wrapped.map((l) => l.length));
 
   items.forEach((item, i) => {
     const cx = x + i * colW + colW / 2;
@@ -84,17 +94,19 @@ export function drawKpiRow(
     doc.setFontSize(16);
     doc.setFont("helvetica", "bold");
     doc.text(item.value.toLocaleString("es-VE"), cx, y + 6, { align: "center" });
+
     doc.setFontSize(7);
     doc.setFont("helvetica", "normal");
     doc.setTextColor(107, 114, 128);
-    doc.text(item.label.toUpperCase(), cx, y + 12, { align: "center" });
+    doc.text(wrapped[i], cx, y + 11, { align: "center" });
+
     if (item.sub) {
       doc.setFontSize(6);
-      doc.text(item.sub, cx, y + 16, { align: "center" });
+      doc.text(item.sub, cx, y + 11 + maxLabelLines * labelLineH + 0.5, { align: "center" });
     }
   });
 
-  return y + (hasSub ? 22 : 18);
+  return y + 11 + maxLabelLines * labelLineH + (hasSub ? 5 : 1);
 }
 
 export type LegendItem = {

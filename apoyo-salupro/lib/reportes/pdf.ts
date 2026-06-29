@@ -204,7 +204,29 @@ function drawCohortCharts(
   contentW: number,
   summary: NonNullable<ExportPayload["summary"]>,
 ): number {
-  const obs = summary.pacientes.en_observacion;
+  const p = summary.pacientes;
+  const obs = p.en_observacion;
+
+  // Reconciliación del total: Total = En observación + Alta/traslado + Localizados.
+  y = drawKpiRow(doc, {
+    x: margin,
+    y,
+    width: contentW,
+    items: [
+      { label: "Total", value: p.total },
+      { label: "En observación", value: obs.total, color: PRIMARY },
+      { label: "Alta / traslado", value: p.dados_alta_traslado.total, color: GREEN },
+      { label: "Localizados / a salvo", value: p.localizados.total, color: GRAY },
+    ],
+  });
+  doc.setFontSize(8);
+  doc.setTextColor(107, 114, 128);
+  doc.text(
+    `Total ${p.total} = En observación ${obs.total} + Alta/traslado ${p.dados_alta_traslado.total} + Localizados ${p.localizados.total}`,
+    margin,
+    y,
+  );
+  y += 5;
 
   y = drawKpiRow(doc, {
     x: margin,
@@ -337,7 +359,7 @@ function buildResumenPdf(payload: ExportPayload): Buffer {
     y,
     width: contentW,
     items: destinoItems.map((item) => ({
-      label: item.label.length > 18 ? `${item.label.slice(0, 16)}…` : item.label,
+      label: item.label,
       value: item.value,
       color: item.color,
     })),
