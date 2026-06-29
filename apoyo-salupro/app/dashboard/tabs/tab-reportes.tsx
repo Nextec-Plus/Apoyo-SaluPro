@@ -8,7 +8,13 @@ import { TRIAGE_LEVELS } from "@/lib/triage-levels";
 import type { TriageCategory } from "@/lib/types/database";
 import { useToast } from "@/components/toast-provider";
 
-type ExportType = "resumen" | "pacientes" | "desaparecidos" | "encontrados" | "fallecidos";
+type ExportType =
+  | "resumen"
+  | "pacientes"
+  | "pacientes-triaje"
+  | "desaparecidos"
+  | "encontrados"
+  | "fallecidos";
 type ExportFormat = "csv" | "pdf";
 type ExportKey = `${ExportType}:${ExportFormat}`;
 
@@ -423,6 +429,15 @@ export function TabReportes() {
             onPdf={() => download("pacientes", "pdf")}
             loadingCsv={exporting === "pacientes:csv"}
             loadingPdf={exporting === "pacientes:pdf"}
+            accent=""
+          />
+          <ExportCard
+            label="Listado de Pacientes por Triaje"
+            description="Solo quienes pasaron por triaje (con cédula, edad y ficha completa)"
+            onCsv={() => download("pacientes-triaje", "csv")}
+            onPdf={() => download("pacientes-triaje", "pdf")}
+            loadingCsv={exporting === "pacientes-triaje:csv"}
+            loadingPdf={exporting === "pacientes-triaje:pdf"}
             accent=""
           />
           <ExportCard

@@ -8,6 +8,7 @@ import { createServiceClient } from "@/lib/supabase/server";
 
 const EXPORT_TYPES = new Set<string>([
   "pacientes",
+  "pacientes-triaje",
   "desaparecidos",
   "encontrados",
   "fallecidos",

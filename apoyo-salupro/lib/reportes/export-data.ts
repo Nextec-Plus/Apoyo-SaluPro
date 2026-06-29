@@ -13,6 +13,7 @@ import type { Database, MissingPerson, MissingPersonStatus } from "@/lib/types/d
 export type ExportType =
   | "resumen"
   | "pacientes"
+  | "pacientes-triaje"
   | "desaparecidos"
   | "encontrados"
   | "fallecidos";
@@ -185,8 +186,13 @@ export async function buildExportPayload(
     };
   }
 
-  if (type === "pacientes") {
-    const summary = await buildReportesSummary(organizationId);
+  if (type === "pacientes" || type === "pacientes-triaje") {
+    // "pacientes-triaje": solo quienes pasaron por triaje (tienen ficha con
+    // todos los datos). Los localizados/referidos no tienen ficha, así que el
+    // inner join los excluye. La "Lista de pacientes" normal los incluye a todos.
+    const onlyTriaje = type === "pacientes-triaje";
+    const summary = onlyTriaje ? undefined : await buildReportesSummary(organizationId);
+    const infoEmbed = `catastrophe_victim_info${onlyTriaje ? "!inner" : ""}(triage_category, estado_destino, motivo_principal_consulta, condiciones_preexistentes, alergias, tratamiento_medicamentos, fecha_hora_entrada)`;
 
     // Paginado: PostgREST corta en 1000 filas por petición; sin esto el export
     // dejaba fuera a los pacientes a partir del 1000.
@@ -212,7 +218,7 @@ export async function buildExportPayload(
       const page = await supabase
         .from("catastrophe_victims")
         .select(
-          "registration_number, nombre_completo, cedula, edad, genero, telefono_contacto, sector_comunidad, nombre_edificio_casa, numero_apartamento_casa, ubicacion_actual_refugio, notas, created_at, catastrophe_victim_info(triage_category, estado_destino, motivo_principal_consulta, condiciones_preexistentes, alergias, tratamiento_medicamentos, fecha_hora_entrada)",
+          `registration_number, nombre_completo, cedula, edad, genero, telefono_contacto, sector_comunidad, nombre_edificio_casa, numero_apartamento_casa, ubicacion_actual_refugio, notas, created_at, ${infoEmbed}`,
         )
         .eq("organization_id", organizationId)
         .order("created_at", { ascending: false })
@@ -271,10 +277,12 @@ export async function buildExportPayload(
     });
 
     return {
-      exportType: "pacientes",
-      title: "Lista de pacientes — Apoyo SaluPro",
+      exportType: type,
+      title: onlyTriaje
+        ? "Listado de Pacientes por Triaje — Apoyo SaluPro"
+        : "Lista de pacientes — Apoyo SaluPro",
       subtitle: `${rows.length} registro(s)`,
-      filenameBase: "pacientes",
+      filenameBase: onlyTriaje ? "pacientes-por-triaje" : "pacientes",
       summary,
       headers,
       rows,
@@ -282,7 +290,7 @@ export async function buildExportPayload(
   }
 
   const meta: Record<
-    Exclude<ExportType, "resumen" | "pacientes">,
+    Exclude<ExportType, "resumen" | "pacientes" | "pacientes-triaje">,
     { estado: MissingPersonStatus; title: string; filenameBase: string }
   > = {
     desaparecidos: {
