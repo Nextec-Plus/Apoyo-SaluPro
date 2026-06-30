@@ -594,6 +594,9 @@ export function TabTriaje() {
     [cases],
   );
 
+  const observationCasesRef = useRef(observationCases);
+  observationCasesRef.current = observationCases;
+
   const filteredCases = useMemo(
     () => observationCases.filter((c) => matchesSearch(c, search)),
     [observationCases, search],
@@ -654,7 +657,7 @@ export function TabTriaje() {
     const AUTO_EGRESO_MS = 30 * 60_000;
     const autoEgreso = () => {
       const now = Date.now();
-      for (const caso of casesRef.current) {
+      for (const caso of observationCasesRef.current) {
         if (caso.triage_category !== "Verde") continue;
         const elapsed = now - new Date(caso.fecha_hora_entrada).getTime();
         if (elapsed >= AUTO_EGRESO_MS) {
