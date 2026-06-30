@@ -6,12 +6,14 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { TabInventario } from "./tab-inventario";
 import { TabAdmin } from "./tab-admin";
+import { TabSolicitudes } from "./tab-solicitudes";
 
-type Tab = "inventario" | "admin";
+type Tab = "inventario" | "admin" | "solicitudes";
 
 const TABS: { id: Tab; label: string; icon: string }[] = [
   { id: "inventario", label: "Inventario", icon: "📦" },
   { id: "admin", label: "Administración", icon: "⚙️" },
+  { id: "solicitudes", label: "Solicitudes", icon: "📋" },
 ];
 
 export function InventarioClient() {
@@ -100,6 +102,7 @@ export function InventarioClient() {
       <main className="flex-1 max-w-5xl mx-auto w-full px-4 sm:px-6 py-6">
         {activeTab === "inventario" && <TabInventario />}
         {activeTab === "admin" && <TabAdmin />}
+        {activeTab === "solicitudes" && <TabSolicitudes />}
       </main>
 
       <footer className="bg-gray-800 text-gray-400 text-center py-3 text-xs border-t border-gray-700">

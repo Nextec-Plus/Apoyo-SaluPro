@@ -646,6 +646,57 @@ export type Database = {
           },
         ]
       }
+      supply_requests: {
+        Row: {
+          id: string
+          nombre: string
+          cedula_rif: string | null
+          telefono: string
+          correo: string | null
+          tipo_solicitante: Database["public"]["Enums"]["solicitor_type"]
+          latitud: number | null
+          longitud: number | null
+          direccion: string | null
+          secciones_solicitadas: Json
+          notas: string | null
+          estado: Database["public"]["Enums"]["supply_request_status"]
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          nombre: string
+          cedula_rif?: string | null
+          telefono: string
+          correo?: string | null
+          tipo_solicitante?: Database["public"]["Enums"]["solicitor_type"]
+          latitud?: number | null
+          longitud?: number | null
+          direccion?: string | null
+          secciones_solicitadas?: Json
+          notas?: string | null
+          estado?: Database["public"]["Enums"]["supply_request_status"]
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          nombre?: string
+          cedula_rif?: string | null
+          telefono?: string
+          correo?: string | null
+          tipo_solicitante?: Database["public"]["Enums"]["solicitor_type"]
+          latitud?: number | null
+          longitud?: number | null
+          direccion?: string | null
+          secciones_solicitadas?: Json
+          notas?: string | null
+          estado?: Database["public"]["Enums"]["supply_request_status"]
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -674,6 +725,8 @@ export type Database = {
       missing_person_status: "Desaparecido" | "Avistado" | "Encontrado" | "Confirmado Fallecido"
       missing_person_match_type: "cedula" | "nombre"
       inventory_movement_type: "entrada" | "salida"
+      supply_request_status: "Pendiente" | "En revisión" | "Aprobado" | "Despachado" | "Cerrado"
+      solicitor_type: "Persona" | "Clínica / Hospital" | "Centro de acopio"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -874,3 +927,10 @@ export type UpdateInventoryItem = TablesUpdate<"inventory_items">
 export type InventoryMovement = Tables<"inventory_movements">
 export type InsertInventoryMovement = TablesInsert<"inventory_movements">
 export type UpdateInventoryMovement = TablesUpdate<"inventory_movements">
+
+// ── Supply Requests ─────────────────────────────────────────────────────────
+export type SupplyRequestStatus = Database["public"]["Enums"]["supply_request_status"]
+export type SolicitorType = Database["public"]["Enums"]["solicitor_type"]
+export type SupplyRequest = Tables<"supply_requests">
+export type InsertSupplyRequest = TablesInsert<"supply_requests">
+export type UpdateSupplyRequest = TablesUpdate<"supply_requests">

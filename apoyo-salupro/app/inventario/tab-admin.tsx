@@ -91,7 +91,7 @@ function ArticulosPanel({
   const [sectionId, setSectionId] = useState("");
   const [subcategoryId, setSubcategoryId] = useState("");
   const [presentacion, setPresentacion] = useState("");
-  const [locationId, setLocationId] = useState("");
+  const [stockInicial, setStockInicial] = useState("");
   const [creating, setCreating] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
 
@@ -105,6 +105,9 @@ function ArticulosPanel({
     if (!subcategoryId) return toast.error("Seleccione una subcategoría.");
     const pres = presentacion.trim();
     if (!pres) return toast.error("La presentación es obligatoria.");
+    const stock0 = stockInicial === "" ? 0 : Number(stockInicial);
+    if (!Number.isFinite(stock0) || stock0 < 0 || !Number.isInteger(stock0))
+      return toast.error("Stock inicial debe ser un número entero ≥ 0.");
 
     setCreating(true);
     try {
@@ -114,7 +117,7 @@ function ArticulosPanel({
         body: JSON.stringify({
           subcategory_id: subcategoryId,
           presentacion: pres,
-          location_id: locationId || null,
+          location_id: null,
         }),
       });
       const json = await res.json();
@@ -122,8 +125,28 @@ function ArticulosPanel({
         if (res.status === 409) throw new Error("Ya existe un artículo con esa presentación en esta subcategoría.");
         throw new Error(json.error || "No se pudo crear el artículo");
       }
-      toast.success(`Artículo "${pres}" registrado`);
+
+      // Carga inicial: registrar movimiento de entrada si stock0 > 0
+      if (stock0 > 0) {
+        const mvRes = await fetch("/api/inventory/movements", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            item_id: json.data.id,
+            tipo: "entrada",
+            cantidad: stock0,
+            nota: "Carga inicial",
+          }),
+        });
+        const mvJson = await mvRes.json();
+        if (!mvRes.ok || mvJson.error) throw new Error(mvJson.error || "Artículo creado pero no se pudo registrar la carga inicial.");
+        toast.success(`Artículo "${pres}" registrado con carga inicial de ${stock0} unidades`);
+      } else {
+        toast.success(`Artículo "${pres}" registrado (stock 0)`);
+      }
+
       setPresentacion("");
+      setStockInicial("");
       await onChanged();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Error inesperado");
@@ -153,8 +176,8 @@ function ArticulosPanel({
           Registrar artículo
         </h3>
         <p className="text-xs text-gray-500">
-          Cada artículo = subcategoría + presentación específica (ej: "Pediátricos · Jarabe 120ml").
-          El stock inicial es 0; se incrementa con entradas.
+          Cada artículo = subcategoría + presentación específica (ej: {'\u201C'}Pediátricos · Jarabe 120ml{'\u201D'}).
+          Si indicas un stock inicial, se registra automáticamente como carga inicial en el kardex.
         </p>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
@@ -193,15 +216,26 @@ function ArticulosPanel({
               className={inputCls}
             />
           </div>
-          {/* <div>
-            <label className={labelCls}>Ubicación (opcional)</label>
-            <select value={locationId} onChange={(e) => setLocationId(e.target.value)} className={inputCls}>
-              <option value="">— Sin asignar —</option>
-              {locations.map((l) => (
-                <option key={l.id} value={l.id}>{l.name}</option>
-              ))}
-            </select>
-          </div> */}
+          <div>
+            <label className={labelCls}>
+              Stock inicial{" "}
+              <span className="font-normal text-gray-400">(unidades — opcional, 0 por defecto)</span>
+            </label>
+            <input
+              type="number"
+              min={0}
+              step={1}
+              value={stockInicial}
+              onChange={(e) => setStockInicial(e.target.value)}
+              placeholder="0"
+              className={inputCls}
+            />
+            {stockInicial !== "" && Number(stockInicial) > 0 && (
+              <p className="text-[11px] text-primary mt-1">
+                ✓ Se registrará una entrada de <strong>{stockInicial}</strong> unidades como {'\u201C'}Carga inicial{'\u201D'} en el kardex.
+              </p>
+            )}
+          </div>
         </div>
         <button
           type="submit"

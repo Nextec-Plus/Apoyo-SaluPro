@@ -160,6 +160,8 @@ function MovimientoForm({
   onCreated: () => void;
 }) {
   const toast = useToast();
+  const [sectionId, setSectionId] = useState("");
+  const [subcategoryId, setSubcategoryId] = useState("");
   const [itemId, setItemId] = useState("");
   const [cantidad, setCantidad] = useState("");
   const [entregadoPor, setEntregadoPor] = useState("");
@@ -171,6 +173,30 @@ function MovimientoForm({
   const cantidadRef = useRef<HTMLInputElement>(null);
 
   const selected = useMemo(() => items.find((it) => it.id === itemId) ?? null, [items, itemId]);
+
+  const sectionsFromItems = useMemo(() => {
+    const map = new Map<string, { id: string; name: string; code: string }>();
+    for (const it of items) {
+      const s = it.subcategory?.section;
+      if (s && !map.has(s.id)) map.set(s.id, { id: s.id, name: s.name, code: s.code ?? `${s.id.slice(0, 4)}` });
+    }
+    return Array.from(map.values());
+  }, [items]);
+
+  const subcategoriesForSection = useMemo(() => {
+    if (!sectionId) return [];
+    const map = new Map<string, { id: string; name: string }>();
+    for (const it of items) {
+      const sc = it.subcategory;
+      if (sc && sc.section?.id === sectionId && !map.has(sc.id)) map.set(sc.id, { id: sc.id, name: sc.name });
+    }
+    return Array.from(map.values());
+  }, [items, sectionId]);
+
+  const filteredItems = useMemo(() => {
+    if (!subcategoryId) return [] as ItemRow[];
+    return items.filter((it) => it.subcategory?.id === subcategoryId);
+  }, [items, subcategoryId]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -200,8 +226,10 @@ function MovimientoForm({
 
       const count = sessionCount + 1;
       setSessionCount(count);
+      const secName = selected?.subcategory?.section?.name ?? "";
+      const subName = selected?.subcategory?.name ?? "";
       const label = selected
-        ? `"${selected.presentacion}" (${selected.subcategory?.name ?? ""})`
+        ? `"${selected.presentacion}" (${[secName, subName].filter(Boolean).join(" › ")})`
         : "artículo";
       toast.success(
         tipo === "entrada"
@@ -230,36 +258,70 @@ function MovimientoForm({
           : "💡 Registra materiales que salen del centro hacia un destinatario."}
       </p>
 
-      {/* Selector de artículo */}
-      <div>
-        <label className={labelCls}>Artículo</label>
-        <select
-          value={itemId}
-          onChange={(e) => setItemId(e.target.value)}
-          className={inputCls}
-          disabled={loading}
-        >
-          <option value="">— Seleccione —</option>
-          {items.map((it) => {
-            const sec = it.subcategory?.section?.name ?? "";
-            const sub = it.subcategory?.name ?? "";
-            const path = [sec, sub].filter(Boolean).join(" › ");
-            const disabled = tipo === "salida" && it.stock === 0;
-            return (
-              <option key={it.id} value={it.id} disabled={disabled}>
-                {path ? `${path} · ` : ""}{it.presentacion}
-                {tipo === "salida" ? ` (${it.stock} disp.)` : ""}
-              </option>
-            );
-          })}
-        </select>
-        {selected && (
-          <p className="text-[11px] text-gray-400 mt-1">
-            📍 {selected.location?.name ?? "Sin ubicación asignada"}
-            {tipo === "salida" && <span className="ml-3 font-semibold text-gray-600">Stock: {selected.stock}</span>}
-          </p>
-        )}
+      {/* Selectores en cascada: Sección → Subcategoría → Artículo */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div>
+          <label className={labelCls}>Sección</label>
+          <select
+            value={sectionId}
+            onChange={(e) => {
+              setSectionId(e.target.value);
+              setSubcategoryId("");
+              setItemId("");
+            }}
+            className={inputCls}
+            disabled={loading}
+          >
+            <option value="">— Seleccione —</option>
+            {sectionsFromItems.map((s) => (
+              <option key={s.id} value={s.id}>{s.name}</option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className={labelCls}>Subcategoría</label>
+          <select
+            value={subcategoryId}
+            onChange={(e) => {
+              setSubcategoryId(e.target.value);
+              setItemId("");
+            }}
+            className={inputCls}
+            disabled={!sectionId}
+          >
+            <option value="">— Seleccione —</option>
+            {subcategoriesForSection.map((sc) => (
+              <option key={sc.id} value={sc.id}>{sc.name}</option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className={labelCls}>Artículo</label>
+          <select
+            value={itemId}
+            onChange={(e) => setItemId(e.target.value)}
+            className={inputCls}
+            disabled={!subcategoryId}
+          >
+            <option value="">— Seleccione —</option>
+            {filteredItems.map((it) => {
+              const disabled = tipo === "salida" && it.stock === 0;
+              return (
+                <option key={it.id} value={it.id} disabled={disabled}>
+                  {it.presentacion}
+                  {tipo === "salida" ? ` (${it.stock} disp.)` : ""}
+                </option>
+              );
+            })}
+          </select>
+        </div>
       </div>
+      {selected && (
+        <p className="text-[11px] text-gray-400 mt-1">
+          📍 {selected.location?.name ?? "Sin ubicación asignada"}
+          {tipo === "salida" && <span className="ml-3 font-semibold text-gray-600">Stock: {selected.stock}</span>}
+        </p>
+      )}
 
       {/* Cantidad */}
       <div className="w-40">
