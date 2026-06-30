@@ -372,76 +372,168 @@ export type Database = {
           },
         ]
       }
-      inventory_materials: {
+      inventory_locations: {
         Row: {
           id: string
           organization_id: string
-          nombre: string
-          categoria: string
-          descripcion: string | null
-          codigo: string | null
-          unidad: string | null
-          stock_total: number
+          name: string
+          is_active: boolean
           created_at: string
           updated_at: string
         }
         Insert: {
           id?: string
           organization_id: string
-          nombre: string
-          categoria: string
-          descripcion?: string | null
-          codigo?: string | null
-          unidad?: string | null
-          stock_total?: number
+          name: string
+          is_active?: boolean
           created_at?: string
           updated_at?: string
         }
         Update: {
           id?: string
           organization_id?: string
-          nombre?: string
-          categoria?: string
-          descripcion?: string | null
-          codigo?: string | null
-          unidad?: string | null
-          stock_total?: number
+          name?: string
+          is_active?: boolean
           created_at?: string
           updated_at?: string
         }
         Relationships: []
       }
-      inventory_medical_centers: {
+      inventory_categories: {
         Row: {
           id: string
           organization_id: string
-          nombre: string
-          ubicacion: string
-          telefono: string | null
-          contacto: string | null
-          notas: string | null
+          code: string | null
+          name: string
+          description: string | null
+          parent_id: string | null
+          location_id: string | null
+          is_active: boolean
           created_at: string
           updated_at: string
         }
         Insert: {
           id?: string
           organization_id: string
-          nombre: string
-          ubicacion: string
-          telefono?: string | null
-          contacto?: string | null
-          notas?: string | null
+          code?: string | null
+          name: string
+          description?: string | null
+          parent_id?: string | null
+          location_id?: string | null
+          is_active?: boolean
           created_at?: string
           updated_at?: string
         }
         Update: {
           id?: string
           organization_id?: string
-          nombre?: string
-          ubicacion?: string
-          telefono?: string | null
-          contacto?: string | null
-          notas?: string | null
+          code?: string | null
+          name?: string
+          description?: string | null
+          parent_id?: string | null
+          location_id?: string | null
+          is_active?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_categories_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_categories_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_categories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inventory_materials: {
+        Row: {
+          id: string
+          organization_id: string
+          name: string
+          category_id: string | null
+          description: string | null
+          unit: string | null
+          stock: number
+          is_active: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          organization_id: string
+          name: string
+          category_id?: string | null
+          description?: string | null
+          unit?: string | null
+          stock?: number
+          is_active?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          organization_id?: string
+          name?: string
+          category_id?: string | null
+          description?: string | null
+          unit?: string | null
+          stock?: number
+          is_active?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_materials_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_categories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inventory_medical_centers: {
+        Row: {
+          id: string
+          organization_id: string
+          name: string
+          location: string | null
+          contact: string | null
+          phone: string | null
+          notes: string | null
+          is_active: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          organization_id: string
+          name: string
+          location?: string | null
+          contact?: string | null
+          phone?: string | null
+          notes?: string | null
+          is_active?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          organization_id?: string
+          name?: string
+          location?: string | null
+          contact?: string | null
+          phone?: string | null
+          notes?: string | null
+          is_active?: boolean
           created_at?: string
           updated_at?: string
         }
@@ -452,11 +544,11 @@ export type Database = {
           id: string
           organization_id: string
           material_id: string
-          centro_medico_id: string
+          medical_center_id: string
+          quantity: number
+          status: Database["public"]["Enums"]["assignment_status"]
+          notes: string | null
           fecha: string
-          cantidad: number
-          estado: Database["public"]["Enums"]["assignment_status"]
-          notas: string | null
           created_at: string
           updated_at: string
         }
@@ -464,11 +556,11 @@ export type Database = {
           id?: string
           organization_id: string
           material_id: string
-          centro_medico_id: string
+          medical_center_id: string
+          quantity: number
+          status?: Database["public"]["Enums"]["assignment_status"]
+          notes?: string | null
           fecha?: string
-          cantidad: number
-          estado?: Database["public"]["Enums"]["assignment_status"]
-          notas?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -476,11 +568,11 @@ export type Database = {
           id?: string
           organization_id?: string
           material_id?: string
-          centro_medico_id?: string
+          medical_center_id?: string
+          quantity?: number
+          status?: Database["public"]["Enums"]["assignment_status"]
+          notes?: string | null
           fecha?: string
-          cantidad?: number
-          estado?: Database["public"]["Enums"]["assignment_status"]
-          notas?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -493,8 +585,8 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "inventory_assignments_centro_medico_id_fkey"
-            columns: ["centro_medico_id"]
+            foreignKeyName: "inventory_assignments_medical_center_id_fkey"
+            columns: ["medical_center_id"]
             isOneToOne: false
             referencedRelation: "inventory_medical_centers"
             referencedColumns: ["id"]
@@ -505,21 +597,29 @@ export type Database = {
     Views: {
       inventory_materials_assignment_status: {
         Row: {
-          id: string
-          organization_id: string
-          nombre: string
-          categoria: string
-          descripcion: string | null
-          codigo: string | null
-          unidad: string | null
-          stock_total: number
-          created_at: string
-          updated_at: string
-          cantidad_asignada: number
-          cantidad_disponible: number
-          estado_asignacion: "Asignado" | "Sin Asignar"
+          id: string | null
+          organization_id: string | null
+          name: string | null
+          category_id: string | null
+          description: string | null
+          unit: string | null
+          stock: number | null
+          is_active: boolean | null
+          created_at: string | null
+          updated_at: string | null
+          cantidad_asignada: number | null
+          cantidad_disponible: number | null
+          estado_asignacion: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "inventory_materials_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_categories"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Functions: {
@@ -545,7 +645,7 @@ export type Database = {
       triage_category: "Rojo" | "Amarillo" | "Verde"
       missing_person_status: "Desaparecido" | "Avistado" | "Encontrado" | "Confirmado Fallecido"
       missing_person_match_type: "cedula" | "nombre"
-      assignment_status: "Activa" | "Devuelta" | "Cancelada"
+      assignment_status: "Despachado" | "Recibido" | "Cancelado"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -728,6 +828,14 @@ export type InsertMissingPersonFound = TablesInsert<"missing_person_found">
 
 // ── Inventory ───────────────────────────────────────────────────────────────
 export type AssignmentStatus = Database["public"]["Enums"]["assignment_status"]
+
+export type InventoryLocation = Tables<"inventory_locations">
+export type InsertInventoryLocation = TablesInsert<"inventory_locations">
+export type UpdateInventoryLocation = TablesUpdate<"inventory_locations">
+
+export type InventoryCategory = Tables<"inventory_categories">
+export type InsertInventoryCategory = TablesInsert<"inventory_categories">
+export type UpdateInventoryCategory = TablesUpdate<"inventory_categories">
 
 export type InventoryMaterial = Tables<"inventory_materials">
 export type InsertInventoryMaterial = TablesInsert<"inventory_materials">
