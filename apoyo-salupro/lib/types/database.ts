@@ -372,9 +372,155 @@ export type Database = {
           },
         ]
       }
+      inventory_materials: {
+        Row: {
+          id: string
+          organization_id: string
+          nombre: string
+          categoria: string
+          descripcion: string | null
+          codigo: string | null
+          unidad: string | null
+          stock_total: number
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          organization_id: string
+          nombre: string
+          categoria: string
+          descripcion?: string | null
+          codigo?: string | null
+          unidad?: string | null
+          stock_total?: number
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          organization_id?: string
+          nombre?: string
+          categoria?: string
+          descripcion?: string | null
+          codigo?: string | null
+          unidad?: string | null
+          stock_total?: number
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      inventory_medical_centers: {
+        Row: {
+          id: string
+          organization_id: string
+          nombre: string
+          ubicacion: string
+          telefono: string | null
+          contacto: string | null
+          notas: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          organization_id: string
+          nombre: string
+          ubicacion: string
+          telefono?: string | null
+          contacto?: string | null
+          notas?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          organization_id?: string
+          nombre?: string
+          ubicacion?: string
+          telefono?: string | null
+          contacto?: string | null
+          notas?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      inventory_assignments: {
+        Row: {
+          id: string
+          organization_id: string
+          material_id: string
+          centro_medico_id: string
+          fecha: string
+          cantidad: number
+          estado: Database["public"]["Enums"]["assignment_status"]
+          notas: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          organization_id: string
+          material_id: string
+          centro_medico_id: string
+          fecha?: string
+          cantidad: number
+          estado?: Database["public"]["Enums"]["assignment_status"]
+          notas?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          organization_id?: string
+          material_id?: string
+          centro_medico_id?: string
+          fecha?: string
+          cantidad?: number
+          estado?: Database["public"]["Enums"]["assignment_status"]
+          notas?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_assignments_material_id_fkey"
+            columns: ["material_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_materials"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_assignments_centro_medico_id_fkey"
+            columns: ["centro_medico_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_medical_centers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
-      [_ in never]: never
+      inventory_materials_assignment_status: {
+        Row: {
+          id: string
+          organization_id: string
+          nombre: string
+          categoria: string
+          descripcion: string | null
+          codigo: string | null
+          unidad: string | null
+          stock_total: number
+          created_at: string
+          updated_at: string
+          cantidad_asignada: number
+          cantidad_disponible: number
+          estado_asignacion: "Asignado" | "Sin Asignar"
+        }
+        Relationships: []
+      }
     }
     Functions: {
       [_ in never]: never
@@ -399,6 +545,7 @@ export type Database = {
       triage_category: "Rojo" | "Amarillo" | "Verde"
       missing_person_status: "Desaparecido" | "Avistado" | "Encontrado" | "Confirmado Fallecido"
       missing_person_match_type: "cedula" | "nombre"
+      assignment_status: "Activa" | "Devuelta" | "Cancelada"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -578,3 +725,21 @@ export type UpdateMissingPerson = TablesUpdate<"missing_persons">
 export type MissingPersonImage = Tables<"missing_person_images">
 export type MissingPersonFound = Tables<"missing_person_found">
 export type InsertMissingPersonFound = TablesInsert<"missing_person_found">
+
+// ── Inventory ───────────────────────────────────────────────────────────────
+export type AssignmentStatus = Database["public"]["Enums"]["assignment_status"]
+
+export type InventoryMaterial = Tables<"inventory_materials">
+export type InsertInventoryMaterial = TablesInsert<"inventory_materials">
+export type UpdateInventoryMaterial = TablesUpdate<"inventory_materials">
+
+export type InventoryMedicalCenter = Tables<"inventory_medical_centers">
+export type InsertInventoryMedicalCenter = TablesInsert<"inventory_medical_centers">
+export type UpdateInventoryMedicalCenter = TablesUpdate<"inventory_medical_centers">
+
+export type InventoryAssignment = Tables<"inventory_assignments">
+export type InsertInventoryAssignment = TablesInsert<"inventory_assignments">
+export type UpdateInventoryAssignment = TablesUpdate<"inventory_assignments">
+
+export type InventoryMaterialAssignmentStatus =
+  Database["public"]["Views"]["inventory_materials_assignment_status"]["Row"]
