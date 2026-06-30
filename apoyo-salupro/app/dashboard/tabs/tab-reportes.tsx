@@ -264,14 +264,6 @@ export function TabReportes() {
                 color="text-triage-green"
                 ring="border-triage-green/25"
               />
-              <StatCard
-                loading={loading}
-                value={summary?.pacientes.localizados.total ?? 0}
-                label="Localizados / a salvo"
-                sub="Sin ficha de triaje"
-                color="text-gray-700"
-                ring="border-gray-200"
-              />
             </div>
             {!loading && summary && (
               <p className="text-xs text-gray-500 -mt-2">
