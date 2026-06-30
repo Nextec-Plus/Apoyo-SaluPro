@@ -4,10 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useToast } from "@/components/toast-provider";
 import type { ItemRow, SectionWithSubcats } from "./types";
 import type { InventoryLocation } from "@/lib/types/database";
-
-const inputCls =
-  "w-full text-sm bg-white border border-border rounded-lg px-3 py-2.5 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-ring focus:border-primary transition-colors";
-const labelCls = "block text-xs font-semibold text-gray-700 mb-1";
+import { CascadeStep, inputCls, inputDisabledCls, labelCls } from "./cascade-step";
 
 export function TabAdmin() {
   const toast = useToast();
@@ -179,9 +176,14 @@ function ArticulosPanel({
           Cada artículo = subcategoría + presentación específica (ej: {'\u201C'}Pediátricos · Jarabe 120ml{'\u201D'}).
           Si indicas un stock inicial, se registra automáticamente como carga inicial en el kardex.
         </p>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <div>
-            <label className={labelCls}>Categoría</label>
+        {/* Cascada Categoría → Subcategoría */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <CascadeStep
+            step={1}
+            label="Categoría"
+            active={!!sectionId}
+            blocked={false}
+          >
             <select
               value={sectionId}
               onChange={(e) => { setSectionId(e.target.value); setSubcategoryId(""); }}
@@ -192,23 +194,34 @@ function ArticulosPanel({
                 <option key={s.id} value={s.id}>{s.code}. {s.name}</option>
               ))}
             </select>
-          </div>
-          <div>
-            <label className={labelCls}>Subcategoría</label>
+          </CascadeStep>
+          <CascadeStep
+            step={2}
+            label="Subcategoría"
+            active={!!subcategoryId}
+            blocked={!sectionId}
+            blockHint="Selecciona primero la categoría"
+            onBlockedClick={() => toast.info("Primero selecciona una categoría")}
+          >
             <select
               value={subcategoryId}
               onChange={(e) => setSubcategoryId(e.target.value)}
-              className={inputCls}
-              disabled={!selectedSection}
+              className={!sectionId ? inputDisabledCls : inputCls}
+              disabled={!sectionId}
             >
               <option value="">— Seleccione —</option>
               {(selectedSection?.subcategories ?? []).map((sc) => (
                 <option key={sc.id} value={sc.id}>{sc.code} {sc.name}</option>
               ))}
             </select>
-          </div>
+          </CascadeStep>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
-            <label className={labelCls}>Presentación</label>
+            <label className={labelCls}>
+              Presentación{" "}
+              <span className="font-normal text-gray-400">(nombre específico del artículo)</span>
+            </label>
             <input
               value={presentacion}
               onChange={(e) => setPresentacion(e.target.value)}
