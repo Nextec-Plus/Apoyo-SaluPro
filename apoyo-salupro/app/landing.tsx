@@ -88,6 +88,7 @@ const I = {
   check: "M20 6 9 17l-5-5",
   verify: "m9 12 2 2 4-4M12 3l7 4v5c0 5-3.5 7.5-7 9-3.5-1.5-7-4-7-9V7l7-4Z",
   insumos: "M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2M9 5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2M9 5h6M12 12v4M10 14h4",
+  mapa: "M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5a2.5 2.5 0 0 1 0-5 2.5 2.5 0 0 1 0 5z",
 };
 
 /* ── Landing ────────────────────────────────────────────────────────────── */
@@ -187,6 +188,13 @@ function SiteHeader({ menu, setMenu }: { menu: boolean; setMenu: (v: boolean | (
             Solicitar insumos
           </Link>
           <Link
+            href="/mapa"
+            className="hidden md:inline-flex items-center gap-1.5 rounded-lg border border-blue-200 text-blue-600 hover:bg-blue-50 px-4 py-2 text-sm font-semibold transition-colors"
+          >
+            <Icon path={I.mapa} className="w-4 h-4" />
+            Mapa
+          </Link>
+          <Link
             href="/reportar"
             className="hidden sm:inline-flex items-center gap-1.5 rounded-lg bg-crisis hover:bg-crisis-dark text-white px-4 py-2 text-sm font-semibold transition-colors"
           >
@@ -221,6 +229,9 @@ function SiteHeader({ menu, setMenu }: { menu: boolean; setMenu: (v: boolean | (
           </Link>
           <Link href="/solicitar-insumos" onClick={() => setMenu(false)} className="py-2 font-semibold text-primary">
             📋 Solicitar insumos
+          </Link>
+          <Link href="/mapa" onClick={() => setMenu(false)} className="py-2 font-semibold text-blue-600">
+            🗺️ Ver mapa
           </Link>
           <Link href="/reportar" onClick={() => setMenu(false)} className="py-2 font-semibold text-crisis">
             + Reportar persona
