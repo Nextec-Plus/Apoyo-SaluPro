@@ -334,62 +334,66 @@ function MovimientoForm({
         </div>
         <div>
           <label className={labelCls}>Subcategoría</label>
-          <select
-            value={subcategoryId}
-            onChange={(e) => {
-              setSubcategoryId(e.target.value);
-              setItemId("");
-              setShowQuickCreate(false);
-            }}
-            className={`${inputCls} ${!sectionId ? "opacity-50 bg-gray-100 cursor-not-allowed" : ""}`}
-            disabled={!sectionId}
+          <div
+            onClick={() => { if (!sectionId) toast.info("Primero selecciona una categoría"); }}
+            className={!sectionId ? "cursor-pointer" : ""}
           >
-            <option value="">— Seleccione —</option>
-            {subcategoriesForSection.map((sc) => (
-              <option key={sc.id} value={sc.id}>{sc.name}</option>
-            ))}
-          </select>
-          {!sectionId && (
-            <p className="text-[10px] text-amber-600 mt-0.5">↖ Primero elige una categoría</p>
-          )}
+            <select
+              value={subcategoryId}
+              onChange={(e) => {
+                setSubcategoryId(e.target.value);
+                setItemId("");
+                setShowQuickCreate(false);
+              }}
+              className={inputCls}
+              disabled={!sectionId}
+            >
+              <option value="">— Seleccione —</option>
+              {subcategoriesForSection.map((sc) => (
+                <option key={sc.id} value={sc.id}>{sc.name}</option>
+              ))}
+            </select>
+          </div>
         </div>
         <div>
           <label className={labelCls}>Artículo</label>
-          <select
-            value={itemId}
-            onChange={(e) => {
-              const val = e.target.value;
-              if (val === "__quick_create__") {
-                setShowQuickCreate(true);
-                setItemId("");
-                setTimeout(() => document.getElementById("quick-nombre")?.focus(), 50);
-                return;
-              }
-              setItemId(val);
-              setShowQuickCreate(false);
-            }}
-            className={`${inputCls} ${!subcategoryId ? "opacity-50 bg-gray-100 cursor-not-allowed" : ""}`}
-            disabled={!subcategoryId}
+          <div
+            onClick={() => { if (!subcategoryId) toast.info("Primero selecciona una subcategoría"); }}
+            className={!subcategoryId ? "cursor-pointer" : ""}
           >
-            <option value="">— Seleccione —</option>
-            {filteredItems.map((it) => {
-              const d = tipo === "salida" && it.stock === 0;
-              return (
-                <option key={it.id} value={it.id} disabled={d}>
-                  {it.presentacion}
-                  {tipo === "salida" ? ` (${it.stock} disp.)` : ` (${it.stock})`}
+            <select
+              value={itemId}
+              onChange={(e) => {
+                const val = e.target.value;
+                if (val === "__quick_create__") {
+                  setShowQuickCreate(true);
+                  setItemId("");
+                  setTimeout(() => document.getElementById("quick-nombre")?.focus(), 50);
+                  return;
+                }
+                setItemId(val);
+                setShowQuickCreate(false);
+              }}
+              className={inputCls}
+              disabled={!subcategoryId}
+            >
+              <option value="">— Seleccione —</option>
+              {filteredItems.map((it) => {
+                const d = tipo === "salida" && it.stock === 0;
+                return (
+                  <option key={it.id} value={it.id} disabled={d}>
+                    {it.presentacion}
+                    {tipo === "salida" ? ` (${it.stock} disp.)` : ` (${it.stock})`}
+                  </option>
+                );
+              })}
+              {subcategoryId && (
+                <option value="__quick_create__" className="text-primary font-semibold">
+                  + Nuevo artículo
                 </option>
-              );
-            })}
-            {subcategoryId && (
-              <option value="__quick_create__" className="text-primary font-semibold">
-                + Nuevo artículo
-              </option>
-            )}
-          </select>
-          {!subcategoryId && (
-            <p className="text-[10px] text-amber-600 mt-0.5">↖ Primero elige una subcategoría</p>
-          )}
+              )}
+            </select>
+          </div>
         </div>
       </div>
 
