@@ -3,11 +3,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useToast } from "@/components/toast-provider";
 import type { ItemRow, MovementRow, SectionWithSubcats } from "./types";
+import { CascadeStep, inputCls, inputDisabledCls, labelCls } from "./cascade-step";
 
-const inputCls =
-  "w-full text-sm bg-white border border-border rounded-lg px-3 py-2.5 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-ring focus:border-primary transition-colors";
 const textareaCls = inputCls + " resize-none";
-const labelCls = "block text-xs font-semibold text-gray-700 mb-1";
 
 type SubView = "tablero" | "entrada" | "salida" | "kardex";
 
@@ -331,9 +329,13 @@ function MovimientoForm({
       </p>
 
       {/* Selectores en cascada: Categoría → Subcategoría → Artículo */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <div>
-          <label className={labelCls}>Categoría</label>
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <CascadeStep
+          step={1}
+          label="Categoría"
+          active={!!sectionId}
+          blocked={false}
+        >
           <select
             value={sectionId}
             onChange={(e) => {
@@ -342,7 +344,7 @@ function MovimientoForm({
               setItemId("");
               setShowQuickCreate(false);
             }}
-            className={inputCls}
+            className={loading ? inputDisabledCls : inputCls}
             disabled={loading}
           >
             <option value="">— Seleccione —</option>
@@ -350,71 +352,83 @@ function MovimientoForm({
               <option key={s.id} value={s.id}>{s.name}</option>
             ))}
           </select>
-        </div>
-        <div>
-          <label className={labelCls}>Subcategoría</label>
-          <div
-            onClick={() => { if (!sectionId) toast.info("Primero selecciona una categoría"); }}
-            className={!sectionId ? "cursor-pointer" : ""}
+        </CascadeStep>
+
+        <CascadeStep
+          step={2}
+          label="Subcategoría"
+          active={!!subcategoryId}
+          blocked={!sectionId}
+          blockHint="Selecciona primero la categoría"
+          onBlockedClick={() => toast.info("Primero selecciona una categoría")}
+        >
+          <select
+            value={subcategoryId}
+            onChange={(e) => {
+              setSubcategoryId(e.target.value);
+              setItemId("");
+              setShowQuickCreate(false);
+            }}
+            className={!sectionId ? inputDisabledCls : inputCls}
+            disabled={!sectionId}
           >
-            <select
-              value={subcategoryId}
-              onChange={(e) => {
-                setSubcategoryId(e.target.value);
+            <option value="">— Seleccione —</option>
+            {(selectedSection?.subcategories ?? []).map((sc) => (
+              <option key={sc.id} value={sc.id}>{sc.name}</option>
+            ))}
+          </select>
+        </CascadeStep>
+
+        <CascadeStep
+          step={3}
+          label="Artículo"
+          active={!!itemId}
+          blocked={!subcategoryId}
+          blockHint="Selecciona primero la subcategoría"
+          onBlockedClick={() => toast.info("Primero selecciona una subcategoría")}
+        >
+          <select
+            value={itemId}
+            onChange={(e) => {
+              const val = e.target.value;
+              if (val === "__quick_create__") {
+                setShowQuickCreate(true);
                 setItemId("");
-                setShowQuickCreate(false);
-              }}
-              className={inputCls}
-              disabled={!sectionId}
-            >
-              <option value="">— Seleccione —</option>
-              {(selectedSection?.subcategories ?? []).map((sc) => (
-                <option key={sc.id} value={sc.id}>{sc.name}</option>
-              ))}
-            </select>
-          </div>
-        </div>
-        <div>
-          <label className={labelCls}>Artículo</label>
-          <div
-            onClick={() => { if (!subcategoryId) toast.info("Primero selecciona una subcategoría"); }}
-            className={!subcategoryId ? "cursor-pointer" : ""}
+                setTimeout(() => document.getElementById("quick-nombre")?.focus(), 50);
+                return;
+              }
+              setItemId(val);
+              setShowQuickCreate(false);
+            }}
+            className={!subcategoryId ? inputDisabledCls : inputCls}
+            disabled={!subcategoryId}
           >
-            <select
-              value={itemId}
-              onChange={(e) => {
-                const val = e.target.value;
-                if (val === "__quick_create__") {
-                  setShowQuickCreate(true);
-                  setItemId("");
-                  setTimeout(() => document.getElementById("quick-nombre")?.focus(), 50);
-                  return;
-                }
-                setItemId(val);
-                setShowQuickCreate(false);
-              }}
-              className={inputCls}
-              disabled={!subcategoryId}
-            >
-              <option value="">— Seleccione —</option>
-              {filteredItems.map((it) => {
-                const d = tipo === "salida" && it.stock === 0;
-                return (
-                  <option key={it.id} value={it.id} disabled={d}>
-                    {it.presentacion}
-                    {tipo === "salida" ? ` (${it.stock} disp.)` : ` (${it.stock})`}
-                  </option>
-                );
-              })}
-              {subcategoryId && (
-                <option value="__quick_create__" className="text-primary font-semibold">
-                  + Nuevo artículo
+            <option value="">— Seleccione —</option>
+            {filteredItems.map((it) => {
+              const d = tipo === "salida" && it.stock === 0;
+              return (
+                <option key={it.id} value={it.id} disabled={d}>
+                  {it.presentacion}
+                  {tipo === "salida" ? ` (${it.stock} disp.)` : ` (${it.stock})`}
                 </option>
-              )}
-            </select>
-          </div>
-        </div>
+              );
+            })}
+            {subcategoryId && (
+              <option value="__quick_create__" className="text-primary font-semibold">
+                + Nuevo artículo
+              </option>
+            )}
+          </select>
+        </CascadeStep>
       </div>
+
+      {/* Empty state cuando la subcategoría existe pero no tiene artículos */}
+      {subcategoryId && !itemId && filteredItems.length === 0 && !showQuickCreate && (
+        <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-800 flex items-center gap-2">
+          <span className="text-base">📦</span>
+          <span>No hay artículos en esta subcategoría. Selección <strong>+ Nuevo artículo</strong> en el select de arriba para crear uno.</span>
+        </div>
+      )}
 
       {/* Quick-create inline */}
       {showQuickCreate && subcategoryId && (
