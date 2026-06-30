@@ -15,7 +15,9 @@ export function TabInventario() {
   const toast = useToast();
   const [subView, setSubView] = useState<SubView>("tablero");
   const [items, setItems] = useState<ItemRow[]>([]);
+  const [sections, setSections] = useState<SectionWithSubcats[]>([]);
   const [loadingItems, setLoadingItems] = useState(true);
+  const [loadingSections, setLoadingSections] = useState(true);
 
   const loadItems = useCallback(async () => {
     setLoadingItems(true);
@@ -31,7 +33,24 @@ export function TabInventario() {
     }
   }, [toast]);
 
-  useEffect(() => { loadItems(); }, [loadItems]);
+  const loadSections = useCallback(async () => {
+    setLoadingSections(true);
+    try {
+      const res = await fetch("/api/inventory/sections", { cache: "no-store" });
+      const json = await res.json();
+      if (json.error) throw new Error(json.error);
+      setSections(json.data ?? []);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "No se pudieron cargar las categorías");
+    } finally {
+      setLoadingSections(false);
+    }
+  }, [toast]);
+
+  useEffect(() => {
+    loadItems();
+    loadSections();
+  }, [loadItems, loadSections]);
 
   const subViewOpts: { v: SubView; label: string }[] = [
     { v: "tablero", label: "Tablero" },
@@ -69,10 +88,22 @@ export function TabInventario() {
         <Tablero items={items} loading={loadingItems} />
       )}
       {subView === "entrada" && (
-        <MovimientoForm tipo="entrada" items={items} loading={loadingItems} onCreated={loadItems} />
+        <MovimientoForm
+          tipo="entrada"
+          items={items}
+          sections={sections}
+          loading={loadingItems || loadingSections}
+          onCreated={loadItems}
+        />
       )}
       {subView === "salida" && (
-        <MovimientoForm tipo="salida" items={items} loading={loadingItems} onCreated={loadItems} />
+        <MovimientoForm
+          tipo="salida"
+          items={items}
+          sections={sections}
+          loading={loadingItems || loadingSections}
+          onCreated={loadItems}
+        />
       )}
       {subView === "kardex" && (
         <Kardex items={items} loadingItems={loadingItems} />
@@ -151,11 +182,13 @@ function Tablero({ items, loading }: { items: ItemRow[]; loading: boolean }) {
 function MovimientoForm({
   tipo,
   items,
+  sections,
   loading,
   onCreated,
 }: {
   tipo: "entrada" | "salida";
   items: ItemRow[];
+  sections: SectionWithSubcats[];
   loading: boolean;
   onCreated: () => void;
 }) {
@@ -178,24 +211,10 @@ function MovimientoForm({
 
   const selected = useMemo(() => items.find((it) => it.id === itemId) ?? null, [items, itemId]);
 
-  const sectionsFromItems = useMemo(() => {
-    const map = new Map<string, { id: string; name: string; code: string }>();
-    for (const it of items) {
-      const s = it.subcategory?.section;
-      if (s && !map.has(s.id)) map.set(s.id, { id: s.id, name: s.name, code: s.code ?? `${s.id.slice(0, 4)}` });
-    }
-    return Array.from(map.values());
-  }, [items]);
-
-  const subcategoriesForSection = useMemo(() => {
-    if (!sectionId) return [];
-    const map = new Map<string, { id: string; name: string }>();
-    for (const it of items) {
-      const sc = it.subcategory;
-      if (sc && sc.section?.id === sectionId && !map.has(sc.id)) map.set(sc.id, { id: sc.id, name: sc.name });
-    }
-    return Array.from(map.values());
-  }, [items, sectionId]);
+  const selectedSection = useMemo(
+    () => sections.find((s) => s.id === sectionId) ?? null,
+    [sections, sectionId],
+  );
 
   const filteredItems = useMemo(() => {
     if (!subcategoryId) return [] as ItemRow[];
@@ -327,7 +346,7 @@ function MovimientoForm({
             disabled={loading}
           >
             <option value="">— Seleccione —</option>
-            {sectionsFromItems.map((s) => (
+            {sections.map((s) => (
               <option key={s.id} value={s.id}>{s.name}</option>
             ))}
           </select>
@@ -349,7 +368,7 @@ function MovimientoForm({
               disabled={!sectionId}
             >
               <option value="">— Seleccione —</option>
-              {subcategoriesForSection.map((sc) => (
+              {(selectedSection?.subcategories ?? []).map((sc) => (
                 <option key={sc.id} value={sc.id}>{sc.name}</option>
               ))}
             </select>

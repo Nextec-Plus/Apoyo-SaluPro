@@ -195,17 +195,22 @@ function ArticulosPanel({
           </div>
           <div>
             <label className={labelCls}>Subcategoría</label>
-            <select
-              value={subcategoryId}
-              onChange={(e) => setSubcategoryId(e.target.value)}
-              className={inputCls}
-              disabled={!selectedSection}
+            <div
+              onClick={() => { if (!selectedSection) toast.info("Primero selecciona una categoría"); }}
+              className={!selectedSection ? "cursor-pointer" : ""}
             >
-              <option value="">— Seleccione —</option>
-              {(selectedSection?.subcategories ?? []).map((sc) => (
-                <option key={sc.id} value={sc.id}>{sc.code} {sc.name}</option>
-              ))}
-            </select>
+              <select
+                value={subcategoryId}
+                onChange={(e) => setSubcategoryId(e.target.value)}
+                className={inputCls}
+                disabled={!selectedSection}
+              >
+                <option value="">— Seleccione —</option>
+                {(selectedSection?.subcategories ?? []).map((sc) => (
+                  <option key={sc.id} value={sc.id}>{sc.code} {sc.name}</option>
+                ))}
+              </select>
+            </div>
           </div>
           <div>
             <label className={labelCls}>Presentación</label>
