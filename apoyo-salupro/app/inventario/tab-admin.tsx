@@ -9,11 +9,8 @@ const inputCls =
   "w-full text-sm bg-white border border-border rounded-lg px-3 py-2.5 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-ring focus:border-primary transition-colors";
 const labelCls = "block text-xs font-semibold text-gray-700 mb-1";
 
-type SubView = "articulos" | "ubicaciones";
-
 export function TabAdmin() {
   const toast = useToast();
-  const [subView, setSubView] = useState<SubView>("articulos");
   const [sections, setSections] = useState<SectionWithSubcats[]>([]);
   const [items, setItems] = useState<ItemRow[]>([]);
   const [locations, setLocations] = useState<InventoryLocation[]>([]);
@@ -59,44 +56,18 @@ export function TabAdmin() {
         <div>
           <h2 className="text-lg font-bold text-gray-800">Administración</h2>
           <p className="text-xs text-gray-500 mt-0.5">
-            Artículos del centro · Ubicaciones físicas
+            Artículos del centro de acopio
           </p>
-        </div>
-        <div className="flex gap-1 bg-muted rounded-lg p-1">
-          {([
-            { v: "articulos", label: `Artículos${items.length ? ` (${items.length})` : ""}` },
-            { v: "ubicaciones", label: `Ubicaciones${locations.length ? ` (${locations.length})` : ""}` },
-          ] as const).map((opt) => (
-            <button
-              key={opt.v}
-              type="button"
-              onClick={() => setSubView(opt.v)}
-              className={`text-sm font-semibold px-3.5 py-1.5 rounded-md transition-colors ${
-                subView === opt.v ? "bg-white text-primary shadow-sm" : "text-gray-500 hover:text-gray-800"
-              }`}
-            >
-              {opt.label}
-            </button>
-          ))}
         </div>
       </div>
 
-      {subView === "articulos" && (
-        <ArticulosPanel
-          sections={sections}
-          items={items}
-          locations={locations}
-          loading={loading}
-          onChanged={async () => { await Promise.all([loadItems()]); }}
-        />
-      )}
-      {subView === "ubicaciones" && (
-        <UbicacionesPanel
-          locations={locations}
-          loading={loading}
-          onChanged={loadLocations}
-        />
-      )}
+      <ArticulosPanel
+        sections={sections}
+        items={items}
+        locations={locations}
+        loading={loading}
+        onChanged={async () => { await Promise.all([loadItems()]); }}
+      />
     </div>
   );
 }
@@ -222,7 +193,7 @@ function ArticulosPanel({
               className={inputCls}
             />
           </div>
-          <div>
+          {/* <div>
             <label className={labelCls}>Ubicación (opcional)</label>
             <select value={locationId} onChange={(e) => setLocationId(e.target.value)} className={inputCls}>
               <option value="">— Sin asignar —</option>
@@ -230,7 +201,7 @@ function ArticulosPanel({
                 <option key={l.id} value={l.id}>{l.name}</option>
               ))}
             </select>
-          </div>
+          </div> */}
         </div>
         <button
           type="submit"
@@ -363,101 +334,3 @@ function EditLocationInline({
   );
 }
 
-/* ─────────────────────────────── Ubicaciones ────────────────────────────── */
-
-function UbicacionesPanel({
-  locations,
-  loading,
-  onChanged,
-}: {
-  locations: InventoryLocation[];
-  loading: boolean;
-  onChanged: () => void;
-}) {
-  const toast = useToast();
-  const [name, setName] = useState("");
-  const [description, setDescription] = useState("");
-  const [saving, setSaving] = useState(false);
-
-  const create = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const trimmed = name.trim();
-    if (!trimmed) return toast.error("El nombre es obligatorio.");
-    setSaving(true);
-    try {
-      const res = await fetch("/api/inventory/locations", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: trimmed, description: description.trim() || null }),
-      });
-      const json = await res.json();
-      if (!res.ok || json.error) {
-        if (res.status === 409) throw new Error("Ya existe una ubicación con ese nombre.");
-        throw new Error(json.error || "No se pudo crear");
-      }
-      toast.success(`Ubicación "${trimmed}" creada`);
-      setName("");
-      setDescription("");
-      onChanged();
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Error inesperado");
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <div className="space-y-6">
-      <form onSubmit={create} className="bg-muted border border-border rounded-lg p-4 space-y-3">
-        <h3 className="text-[11px] font-bold uppercase tracking-widest text-gray-400">
-          Nueva ubicación
-        </h3>
-        <p className="text-xs text-gray-500">
-          Zonas físicas del almacén (ej: Estante A, Sección Refrigerada, Patio).
-        </p>
-        <div className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto] gap-3 items-end">
-          <div>
-            <label className={labelCls}>Nombre</label>
-            <input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Ej: Estante A"
-              className={inputCls}
-            />
-          </div>
-          <div>
-            <label className={labelCls}>Descripción (opcional)</label>
-            <input
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="Ej: Primer nivel, pasillo norte"
-              className={inputCls}
-            />
-          </div>
-          <button
-            type="submit"
-            disabled={saving}
-            className="bg-gray-800 hover:bg-gray-900 text-white font-bold text-sm px-4 py-2.5 rounded-lg disabled:opacity-60"
-          >
-            {saving ? "…" : "Agregar"}
-          </button>
-        </div>
-      </form>
-
-      {loading ? (
-        <p className="text-sm text-gray-400 py-4 text-center">Cargando ubicaciones…</p>
-      ) : locations.length === 0 ? (
-        <p className="text-sm text-gray-400 py-4 text-center">No hay ubicaciones registradas.</p>
-      ) : (
-        <ul className="divide-y divide-border border border-border rounded-lg">
-          {locations.map((l) => (
-            <li key={l.id} className="px-4 py-3">
-              <p className="font-medium text-gray-800">{l.name}</p>
-              {l.description && <p className="text-[11px] text-gray-400">{l.description}</p>}
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
-  );
-}
