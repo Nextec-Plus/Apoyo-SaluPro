@@ -23,7 +23,7 @@ function LoginForm() {
     setLoading(true);
 
     const supabase = createClient();
-    const { error: authError } = await supabase.auth.signInWithPassword({
+    const { data, error: authError } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
@@ -41,7 +41,14 @@ function LoginForm() {
 
     toast.success("Sesión iniciada");
 
-    router.push(redirectTo);
+    // El usuario de inventario solo opera en /inventario; el resto va al
+    // dashboard clínico (o a la ruta solicitada en redirectTo).
+    const role =
+      (data.user?.app_metadata?.role as string | undefined) ??
+      (data.user?.user_metadata?.role as string | undefined);
+    const destination = role === "inventory" ? "/inventario" : redirectTo;
+
+    router.push(destination);
     router.refresh();
   };
 
