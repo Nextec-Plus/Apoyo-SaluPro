@@ -87,6 +87,7 @@ const I = {
   arrow: "M5 12h14M13 6l6 6-6 6",
   check: "M20 6 9 17l-5-5",
   verify: "m9 12 2 2 4-4M12 3l7 4v5c0 5-3.5 7.5-7 9-3.5-1.5-7-4-7-9V7l7-4Z",
+  insumos: "M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2M9 5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2M9 5h6M12 12v4M10 14h4",
 };
 
 /* ── Landing ────────────────────────────────────────────────────────────── */
@@ -179,6 +180,13 @@ function SiteHeader({ menu, setMenu }: { menu: boolean; setMenu: (v: boolean | (
             Desaparecidos
           </Link>
           <Link
+            href="/solicitar-insumos"
+            className="hidden md:inline-flex items-center gap-1.5 rounded-lg border border-primary/40 text-primary hover:bg-primary-light px-4 py-2 text-sm font-semibold transition-colors"
+          >
+            <Icon path={I.insumos} className="w-4 h-4" />
+            Solicitar insumos
+          </Link>
+          <Link
             href="/reportar"
             className="hidden sm:inline-flex items-center gap-1.5 rounded-lg bg-crisis hover:bg-crisis-dark text-white px-4 py-2 text-sm font-semibold transition-colors"
           >
@@ -210,6 +218,9 @@ function SiteHeader({ menu, setMenu }: { menu: boolean; setMenu: (v: boolean | (
           ))}
           <Link href="/desaparecidos" onClick={() => setMenu(false)} className="mt-1 py-2 font-semibold text-crisis">
             Personas desaparecidas
+          </Link>
+          <Link href="/solicitar-insumos" onClick={() => setMenu(false)} className="py-2 font-semibold text-primary">
+            📋 Solicitar insumos
           </Link>
           <Link href="/reportar" onClick={() => setMenu(false)} className="py-2 font-semibold text-crisis">
             + Reportar persona
