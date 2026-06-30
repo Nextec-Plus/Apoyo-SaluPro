@@ -36,21 +36,49 @@ export async function middleware(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
+  const { pathname } = request.nextUrl;
+
   const isProtected =
-    request.nextUrl.pathname.startsWith("/dashboard") ||
-    request.nextUrl.pathname.startsWith("/api/reportes");
+    pathname.startsWith("/dashboard") ||
+    pathname.startsWith("/inventario") ||
+    pathname.startsWith("/api/inventory") ||
+    pathname.startsWith("/api/reportes");
 
   // Rutas protegidas: requieren sesión.
   if (!user && isProtected) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
-    url.searchParams.set("redirectTo", request.nextUrl.pathname);
+    url.searchParams.set("redirectTo", pathname);
     return NextResponse.redirect(url);
+  }
+
+  // Control de acceso por rol: el usuario de inventario solo ve /inventario.
+  // El rol se guarda tanto en app_metadata como en user_metadata al crear el
+  // usuario. Si intenta entrar al dashboard clínico se le redirige.
+  if (user) {
+    const role =
+      (user.app_metadata?.role as string | undefined) ??
+      (user.user_metadata?.role as string | undefined);
+
+    if (
+      role === "inventory" &&
+      (pathname.startsWith("/dashboard") || pathname.startsWith("/api/reportes"))
+    ) {
+      const url = request.nextUrl.clone();
+      url.pathname = "/inventario";
+      url.search = "";
+      return NextResponse.redirect(url);
+    }
   }
 
   return response;
 }
 
 export const config = {
-  matcher: ["/dashboard/:path*", "/api/reportes/:path*"],
+  matcher: [
+    "/dashboard/:path*",
+    "/inventario/:path*",
+    "/api/inventory/:path*",
+    "/api/reportes/:path*",
+  ],
 };

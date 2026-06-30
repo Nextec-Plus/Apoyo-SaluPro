@@ -372,6 +372,280 @@ export type Database = {
           },
         ]
       }
+      acopio_centers: {
+        Row: {
+          id: string
+          organization_id: string
+          name: string
+          ubicacion: string | null
+          is_active: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          organization_id: string
+          name: string
+          ubicacion?: string | null
+          is_active?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          organization_id?: string
+          name?: string
+          ubicacion?: string | null
+          is_active?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      acopio_user_assignments: {
+        Row: {
+          id: string
+          user_id: string
+          acopio_center_id: string
+          role: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          acopio_center_id: string
+          role?: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          acopio_center_id?: string
+          role?: string
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "acopio_user_assignments_acopio_center_id_fkey"
+            columns: ["acopio_center_id"]
+            isOneToOne: false
+            referencedRelation: "acopio_centers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inventory_sections: {
+        Row: {
+          id: string
+          code: string
+          name: string
+          display_order: number
+        }
+        Insert: {
+          id?: string
+          code: string
+          name: string
+          display_order?: number
+        }
+        Update: {
+          id?: string
+          code?: string
+          name?: string
+          display_order?: number
+        }
+        Relationships: []
+      }
+      inventory_subcategories: {
+        Row: {
+          id: string
+          section_id: string
+          code: string
+          name: string
+          description: string | null
+          display_order: number
+        }
+        Insert: {
+          id?: string
+          section_id: string
+          code: string
+          name: string
+          description?: string | null
+          display_order?: number
+        }
+        Update: {
+          id?: string
+          section_id?: string
+          code?: string
+          name?: string
+          description?: string | null
+          display_order?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_subcategories_section_id_fkey"
+            columns: ["section_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_sections"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inventory_locations: {
+        Row: {
+          id: string
+          acopio_center_id: string
+          name: string
+          description: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          acopio_center_id: string
+          name: string
+          description?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          acopio_center_id?: string
+          name?: string
+          description?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_locations_acopio_center_id_fkey"
+            columns: ["acopio_center_id"]
+            isOneToOne: false
+            referencedRelation: "acopio_centers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inventory_items: {
+        Row: {
+          id: string
+          acopio_center_id: string
+          subcategory_id: string
+          presentacion: string
+          location_id: string | null
+          stock: number
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          acopio_center_id: string
+          subcategory_id: string
+          presentacion: string
+          location_id?: string | null
+          stock?: number
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          acopio_center_id?: string
+          subcategory_id?: string
+          presentacion?: string
+          location_id?: string | null
+          stock?: number
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_items_acopio_center_id_fkey"
+            columns: ["acopio_center_id"]
+            isOneToOne: false
+            referencedRelation: "acopio_centers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_items_subcategory_id_fkey"
+            columns: ["subcategory_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_subcategories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_items_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_locations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inventory_movements: {
+        Row: {
+          id: string
+          acopio_center_id: string
+          item_id: string
+          tipo: Database["public"]["Enums"]["inventory_movement_type"]
+          cantidad: number
+          location_id: string | null
+          entregado_por: string | null
+          destinatario: string | null
+          medio_transporte: string | null
+          nota: string | null
+          previous_stock: number
+          new_stock: number
+          created_by: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          acopio_center_id?: string
+          item_id: string
+          tipo: Database["public"]["Enums"]["inventory_movement_type"]
+          cantidad: number
+          location_id?: string | null
+          entregado_por?: string | null
+          destinatario?: string | null
+          medio_transporte?: string | null
+          nota?: string | null
+          previous_stock?: number
+          new_stock?: number
+          created_by?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          acopio_center_id?: string
+          item_id?: string
+          tipo?: Database["public"]["Enums"]["inventory_movement_type"]
+          cantidad?: number
+          location_id?: string | null
+          entregado_por?: string | null
+          destinatario?: string | null
+          medio_transporte?: string | null
+          nota?: string | null
+          previous_stock?: number
+          new_stock?: number
+          created_by?: string | null
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_movements_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_movements_acopio_center_id_fkey"
+            columns: ["acopio_center_id"]
+            isOneToOne: false
+            referencedRelation: "acopio_centers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -399,6 +673,7 @@ export type Database = {
       triage_category: "Rojo" | "Amarillo" | "Verde"
       missing_person_status: "Desaparecido" | "Avistado" | "Encontrado" | "Confirmado Fallecido"
       missing_person_match_type: "cedula" | "nombre"
+      inventory_movement_type: "entrada" | "salida"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -578,3 +853,24 @@ export type UpdateMissingPerson = TablesUpdate<"missing_persons">
 export type MissingPersonImage = Tables<"missing_person_images">
 export type MissingPersonFound = Tables<"missing_person_found">
 export type InsertMissingPersonFound = TablesInsert<"missing_person_found">
+
+// ── Inventory ───────────────────────────────────────────────────────────────
+export type InventoryMovementType = Database["public"]["Enums"]["inventory_movement_type"]
+
+export type AcopioCenter = Tables<"acopio_centers">
+export type AcopioUserAssignment = Tables<"acopio_user_assignments">
+
+export type InventorySection = Tables<"inventory_sections">
+export type InventorySubcategory = Tables<"inventory_subcategories">
+
+export type InventoryLocation = Tables<"inventory_locations">
+export type InsertInventoryLocation = TablesInsert<"inventory_locations">
+export type UpdateInventoryLocation = TablesUpdate<"inventory_locations">
+
+export type InventoryItem = Tables<"inventory_items">
+export type InsertInventoryItem = TablesInsert<"inventory_items">
+export type UpdateInventoryItem = TablesUpdate<"inventory_items">
+
+export type InventoryMovement = Tables<"inventory_movements">
+export type InsertInventoryMovement = TablesInsert<"inventory_movements">
+export type UpdateInventoryMovement = TablesUpdate<"inventory_movements">
