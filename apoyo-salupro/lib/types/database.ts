@@ -372,11 +372,12 @@ export type Database = {
           },
         ]
       }
-      inventory_locations: {
+      acopio_centers: {
         Row: {
           id: string
           organization_id: string
           name: string
+          ubicacion: string | null
           is_active: boolean
           created_at: string
           updated_at: string
@@ -385,6 +386,7 @@ export type Database = {
           id?: string
           organization_id: string
           name: string
+          ubicacion?: string | null
           is_active?: boolean
           created_at?: string
           updated_at?: string
@@ -393,234 +395,260 @@ export type Database = {
           id?: string
           organization_id?: string
           name?: string
+          ubicacion?: string | null
           is_active?: boolean
           created_at?: string
           updated_at?: string
         }
         Relationships: []
       }
-      inventory_categories: {
+      acopio_user_assignments: {
         Row: {
           id: string
-          organization_id: string
-          code: string | null
+          user_id: string
+          acopio_center_id: string
+          role: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          acopio_center_id: string
+          role?: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          acopio_center_id?: string
+          role?: string
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "acopio_user_assignments_acopio_center_id_fkey"
+            columns: ["acopio_center_id"]
+            isOneToOne: false
+            referencedRelation: "acopio_centers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inventory_sections: {
+        Row: {
+          id: string
+          code: string
+          name: string
+          display_order: number
+        }
+        Insert: {
+          id?: string
+          code: string
+          name: string
+          display_order?: number
+        }
+        Update: {
+          id?: string
+          code?: string
+          name?: string
+          display_order?: number
+        }
+        Relationships: []
+      }
+      inventory_subcategories: {
+        Row: {
+          id: string
+          section_id: string
+          code: string
           name: string
           description: string | null
-          parent_id: string | null
-          location_id: string | null
-          is_active: boolean
+          display_order: number
+        }
+        Insert: {
+          id?: string
+          section_id: string
+          code: string
+          name: string
+          description?: string | null
+          display_order?: number
+        }
+        Update: {
+          id?: string
+          section_id?: string
+          code?: string
+          name?: string
+          description?: string | null
+          display_order?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_subcategories_section_id_fkey"
+            columns: ["section_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_sections"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inventory_locations: {
+        Row: {
+          id: string
+          acopio_center_id: string
+          name: string
+          description: string | null
           created_at: string
           updated_at: string
         }
         Insert: {
           id?: string
-          organization_id: string
-          code?: string | null
+          acopio_center_id: string
           name: string
           description?: string | null
-          parent_id?: string | null
-          location_id?: string | null
-          is_active?: boolean
           created_at?: string
           updated_at?: string
         }
         Update: {
           id?: string
-          organization_id?: string
-          code?: string | null
+          acopio_center_id?: string
           name?: string
           description?: string | null
-          parent_id?: string | null
-          location_id?: string | null
-          is_active?: boolean
           created_at?: string
           updated_at?: string
         }
         Relationships: [
           {
-            foreignKeyName: "inventory_categories_location_id_fkey"
+            foreignKeyName: "inventory_locations_acopio_center_id_fkey"
+            columns: ["acopio_center_id"]
+            isOneToOne: false
+            referencedRelation: "acopio_centers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inventory_items: {
+        Row: {
+          id: string
+          acopio_center_id: string
+          subcategory_id: string
+          presentacion: string
+          location_id: string | null
+          stock: number
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          acopio_center_id: string
+          subcategory_id: string
+          presentacion: string
+          location_id?: string | null
+          stock?: number
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          acopio_center_id?: string
+          subcategory_id?: string
+          presentacion?: string
+          location_id?: string | null
+          stock?: number
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_items_acopio_center_id_fkey"
+            columns: ["acopio_center_id"]
+            isOneToOne: false
+            referencedRelation: "acopio_centers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_items_subcategory_id_fkey"
+            columns: ["subcategory_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_subcategories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_items_location_id_fkey"
             columns: ["location_id"]
             isOneToOne: false
             referencedRelation: "inventory_locations"
             referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "inventory_categories_parent_id_fkey"
-            columns: ["parent_id"]
-            isOneToOne: false
-            referencedRelation: "inventory_categories"
-            referencedColumns: ["id"]
-          },
         ]
       }
-      inventory_materials: {
+      inventory_movements: {
         Row: {
           id: string
-          organization_id: string
-          name: string
-          category_id: string | null
-          description: string | null
-          unit: string | null
-          stock: number
-          is_active: boolean
+          acopio_center_id: string
+          item_id: string
+          tipo: Database["public"]["Enums"]["inventory_movement_type"]
+          cantidad: number
+          location_id: string | null
+          entregado_por: string | null
+          destinatario: string | null
+          medio_transporte: string | null
+          nota: string | null
+          previous_stock: number
+          new_stock: number
+          created_by: string | null
           created_at: string
-          updated_at: string
         }
         Insert: {
           id?: string
-          organization_id: string
-          name: string
-          category_id?: string | null
-          description?: string | null
-          unit?: string | null
-          stock?: number
-          is_active?: boolean
+          acopio_center_id?: string
+          item_id: string
+          tipo: Database["public"]["Enums"]["inventory_movement_type"]
+          cantidad: number
+          location_id?: string | null
+          entregado_por?: string | null
+          destinatario?: string | null
+          medio_transporte?: string | null
+          nota?: string | null
+          previous_stock?: number
+          new_stock?: number
+          created_by?: string | null
           created_at?: string
-          updated_at?: string
         }
         Update: {
           id?: string
-          organization_id?: string
-          name?: string
-          category_id?: string | null
-          description?: string | null
-          unit?: string | null
-          stock?: number
-          is_active?: boolean
+          acopio_center_id?: string
+          item_id?: string
+          tipo?: Database["public"]["Enums"]["inventory_movement_type"]
+          cantidad?: number
+          location_id?: string | null
+          entregado_por?: string | null
+          destinatario?: string | null
+          medio_transporte?: string | null
+          nota?: string | null
+          previous_stock?: number
+          new_stock?: number
+          created_by?: string | null
           created_at?: string
-          updated_at?: string
         }
         Relationships: [
           {
-            foreignKeyName: "inventory_materials_category_id_fkey"
-            columns: ["category_id"]
+            foreignKeyName: "inventory_movements_item_id_fkey"
+            columns: ["item_id"]
             isOneToOne: false
-            referencedRelation: "inventory_categories"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      inventory_medical_centers: {
-        Row: {
-          id: string
-          organization_id: string
-          name: string
-          location: string | null
-          contact: string | null
-          phone: string | null
-          notes: string | null
-          is_active: boolean
-          created_at: string
-          updated_at: string
-        }
-        Insert: {
-          id?: string
-          organization_id: string
-          name: string
-          location?: string | null
-          contact?: string | null
-          phone?: string | null
-          notes?: string | null
-          is_active?: boolean
-          created_at?: string
-          updated_at?: string
-        }
-        Update: {
-          id?: string
-          organization_id?: string
-          name?: string
-          location?: string | null
-          contact?: string | null
-          phone?: string | null
-          notes?: string | null
-          is_active?: boolean
-          created_at?: string
-          updated_at?: string
-        }
-        Relationships: []
-      }
-      inventory_assignments: {
-        Row: {
-          id: string
-          organization_id: string
-          material_id: string
-          medical_center_id: string
-          quantity: number
-          status: Database["public"]["Enums"]["assignment_status"]
-          notes: string | null
-          fecha: string
-          created_at: string
-          updated_at: string
-        }
-        Insert: {
-          id?: string
-          organization_id: string
-          material_id: string
-          medical_center_id: string
-          quantity: number
-          status?: Database["public"]["Enums"]["assignment_status"]
-          notes?: string | null
-          fecha?: string
-          created_at?: string
-          updated_at?: string
-        }
-        Update: {
-          id?: string
-          organization_id?: string
-          material_id?: string
-          medical_center_id?: string
-          quantity?: number
-          status?: Database["public"]["Enums"]["assignment_status"]
-          notes?: string | null
-          fecha?: string
-          created_at?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "inventory_assignments_material_id_fkey"
-            columns: ["material_id"]
-            isOneToOne: false
-            referencedRelation: "inventory_materials"
+            referencedRelation: "inventory_items"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "inventory_assignments_medical_center_id_fkey"
-            columns: ["medical_center_id"]
+            foreignKeyName: "inventory_movements_acopio_center_id_fkey"
+            columns: ["acopio_center_id"]
             isOneToOne: false
-            referencedRelation: "inventory_medical_centers"
+            referencedRelation: "acopio_centers"
             referencedColumns: ["id"]
           },
         ]
       }
     }
     Views: {
-      inventory_materials_assignment_status: {
-        Row: {
-          id: string | null
-          organization_id: string | null
-          name: string | null
-          category_id: string | null
-          description: string | null
-          unit: string | null
-          stock: number | null
-          is_active: boolean | null
-          created_at: string | null
-          updated_at: string | null
-          cantidad_asignada: number | null
-          cantidad_disponible: number | null
-          estado_asignacion: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "inventory_materials_category_id_fkey"
-            columns: ["category_id"]
-            isOneToOne: false
-            referencedRelation: "inventory_categories"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
+      [_ in never]: never
     }
     Functions: {
       [_ in never]: never
@@ -645,7 +673,7 @@ export type Database = {
       triage_category: "Rojo" | "Amarillo" | "Verde"
       missing_person_status: "Desaparecido" | "Avistado" | "Encontrado" | "Confirmado Fallecido"
       missing_person_match_type: "cedula" | "nombre"
-      assignment_status: "Despachado" | "Recibido" | "Cancelado"
+      inventory_movement_type: "entrada" | "salida"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -827,27 +855,22 @@ export type MissingPersonFound = Tables<"missing_person_found">
 export type InsertMissingPersonFound = TablesInsert<"missing_person_found">
 
 // ── Inventory ───────────────────────────────────────────────────────────────
-export type AssignmentStatus = Database["public"]["Enums"]["assignment_status"]
+export type InventoryMovementType = Database["public"]["Enums"]["inventory_movement_type"]
+
+export type AcopioCenter = Tables<"acopio_centers">
+export type AcopioUserAssignment = Tables<"acopio_user_assignments">
+
+export type InventorySection = Tables<"inventory_sections">
+export type InventorySubcategory = Tables<"inventory_subcategories">
 
 export type InventoryLocation = Tables<"inventory_locations">
 export type InsertInventoryLocation = TablesInsert<"inventory_locations">
 export type UpdateInventoryLocation = TablesUpdate<"inventory_locations">
 
-export type InventoryCategory = Tables<"inventory_categories">
-export type InsertInventoryCategory = TablesInsert<"inventory_categories">
-export type UpdateInventoryCategory = TablesUpdate<"inventory_categories">
+export type InventoryItem = Tables<"inventory_items">
+export type InsertInventoryItem = TablesInsert<"inventory_items">
+export type UpdateInventoryItem = TablesUpdate<"inventory_items">
 
-export type InventoryMaterial = Tables<"inventory_materials">
-export type InsertInventoryMaterial = TablesInsert<"inventory_materials">
-export type UpdateInventoryMaterial = TablesUpdate<"inventory_materials">
-
-export type InventoryMedicalCenter = Tables<"inventory_medical_centers">
-export type InsertInventoryMedicalCenter = TablesInsert<"inventory_medical_centers">
-export type UpdateInventoryMedicalCenter = TablesUpdate<"inventory_medical_centers">
-
-export type InventoryAssignment = Tables<"inventory_assignments">
-export type InsertInventoryAssignment = TablesInsert<"inventory_assignments">
-export type UpdateInventoryAssignment = TablesUpdate<"inventory_assignments">
-
-export type InventoryMaterialAssignmentStatus =
-  Database["public"]["Views"]["inventory_materials_assignment_status"]["Row"]
+export type InventoryMovement = Tables<"inventory_movements">
+export type InsertInventoryMovement = TablesInsert<"inventory_movements">
+export type UpdateInventoryMovement = TablesUpdate<"inventory_movements">

@@ -4,19 +4,19 @@ import { useEffect, useState } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { TabMateriales } from "./tab-materiales";
-import { TabAsignaciones } from "./tab-asignaciones";
+import { TabInventario } from "./tab-inventario";
+import { TabAdmin } from "./tab-admin";
 
-type Tab = "materiales" | "asignaciones";
+type Tab = "inventario" | "admin";
 
 const TABS: { id: Tab; label: string; icon: string }[] = [
-  { id: "materiales", label: "Materiales", icon: "📦" },
-  { id: "asignaciones", label: "Asignaciones", icon: "🚑" },
+  { id: "inventario", label: "Inventario", icon: "📦" },
+  { id: "admin", label: "Administración", icon: "⚙️" },
 ];
 
 export function InventarioClient() {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<Tab>("materiales");
+  const [activeTab, setActiveTab] = useState<Tab>("inventario");
   const [clock, setClock] = useState("");
 
   useEffect(() => {
@@ -36,7 +36,7 @@ export function InventarioClient() {
 
   return (
     <div className="flex flex-col min-h-screen bg-muted">
-      {/* ── Header ────────────────────────────────────────────────────── */}
+      {/* ── Header ───────────────────────────────────────────────────── */}
       <header className="bg-white border-b border-border shadow-sm sticky top-0 z-50">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between gap-3">
           <div className="flex items-center gap-3 min-w-0">
@@ -52,7 +52,7 @@ export function InventarioClient() {
                 Apoyo SaluPro
               </p>
               <p className="text-[11px] text-gray-500 leading-tight truncate">
-                Gestión de Inventario · Venezuela
+                Centro de Acopio · Gestión de Inventario
               </p>
             </div>
           </div>
@@ -75,7 +75,7 @@ export function InventarioClient() {
         </div>
       </header>
 
-      {/* ── Tab nav ───────────────────────────────────────────────────── */}
+      {/* ── Tab nav ──────────────────────────────────────────────────── */}
       <nav className="bg-white border-b border-border sticky top-[64px] z-40">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 flex">
           {TABS.map((tab) => (
@@ -96,14 +96,14 @@ export function InventarioClient() {
         </div>
       </nav>
 
-      {/* ── Content ───────────────────────────────────────────────────── */}
+      {/* ── Content ──────────────────────────────────────────────────── */}
       <main className="flex-1 max-w-5xl mx-auto w-full px-4 sm:px-6 py-6">
-        {activeTab === "materiales" && <TabMateriales />}
-        {activeTab === "asignaciones" && <TabAsignaciones />}
+        {activeTab === "inventario" && <TabInventario />}
+        {activeTab === "admin" && <TabAdmin />}
       </main>
 
       <footer className="bg-gray-800 text-gray-400 text-center py-3 text-xs border-t border-gray-700">
-        <p>Sistema Descentralizado · Apoyo SaluPro · Gestión de Inventario · Venezuela 2026</p>
+        <p>Sistema Descentralizado · Apoyo SaluPro · Centro de Acopio · Venezuela 2026</p>
       </footer>
     </div>
   );

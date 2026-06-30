@@ -1,34 +1,42 @@
 import type { NextRequest } from 'next/server'
-import { createServiceClient } from '@/lib/supabase/server'
-import { getOrganizationId } from '@/lib/config'
-import type { InsertInventoryLocation } from '@/lib/types/database'
+import { createClient } from '@/lib/supabase/server'
 
-/** GET /api/inventory/locations — secciones físicas del almacén. */
+async function getCenterId(supabase: Awaited<ReturnType<typeof createClient>>) {
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return null
+  const { data } = await supabase
+    .from('acopio_user_assignments')
+    .select('acopio_center_id')
+    .eq('user_id', user.id)
+    .single()
+  return data?.acopio_center_id ?? null
+}
+
+/** GET /api/inventory/locations — ubicaciones del centro del usuario. */
 export async function GET() {
-  const supabase = await createServiceClient()
+  const supabase = await createClient()
+  const centerId = await getCenterId(supabase)
+  if (!centerId) return Response.json({ data: null, error: 'Sin asignación de centro' }, { status: 403 })
+
   const { data, error } = await supabase
     .from('inventory_locations')
     .select('*')
-    .eq('organization_id', getOrganizationId())
-    .eq('is_active', true)
+    .eq('acopio_center_id', centerId)
     .order('name', { ascending: true })
 
   if (error) return Response.json({ data: null, error: error.message }, { status: 500 })
   return Response.json({ data, error: null })
 }
 
-/** POST /api/inventory/locations — crea una sección. */
+/** POST /api/inventory/locations — crea una ubicación para el centro del usuario. */
 export async function POST(request: NextRequest) {
-  const supabase = await createServiceClient()
+  const supabase = await createClient()
+  const centerId = await getCenterId(supabase)
+  if (!centerId) return Response.json({ data: null, error: 'Sin asignación de centro' }, { status: 403 })
 
-  let body: Partial<InsertInventoryLocation>
-  try {
-    body = await request.json()
-  } catch (err) {
-    return Response.json(
-      { data: null, error: `JSON inválido: ${err instanceof Error ? err.message : String(err)}` },
-      { status: 400 },
-    )
+  let body: { name?: string; description?: string }
+  try { body = await request.json() } catch {
+    return Response.json({ data: null, error: 'JSON inválido' }, { status: 400 })
   }
 
   const name = body.name?.trim()
@@ -36,7 +44,7 @@ export async function POST(request: NextRequest) {
 
   const { data, error } = await supabase
     .from('inventory_locations')
-    .insert({ name, organization_id: getOrganizationId() })
+    .insert({ acopio_center_id: centerId, name, description: body.description?.trim() || null })
     .select()
     .single()
 

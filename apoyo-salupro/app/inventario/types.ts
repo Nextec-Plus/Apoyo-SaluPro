@@ -1,20 +1,26 @@
 import type {
-  InventoryCategory,
+  InventorySection,
+  InventorySubcategory,
   InventoryLocation,
-  InventoryMaterialAssignmentStatus,
-  InventoryAssignment,
-} from "@/lib/types/database";
+  InventoryItem,
+  InventoryMovement,
+} from '@/lib/types/database'
 
-/** Categoría con el nombre de su localización embebido (tal como la devuelve la API). */
-export type CategoryWithLocation = InventoryCategory & {
-  location: Pick<InventoryLocation, "id" | "name"> | null;
-};
+export type SectionWithSubcats = InventorySection & {
+  subcategories: InventorySubcategory[]
+}
 
-/** Fila de material con su estado de stock (vista inventory_materials_assignment_status). */
-export type MaterialRow = InventoryMaterialAssignmentStatus;
+export type ItemRow = InventoryItem & {
+  subcategory: (InventorySubcategory & {
+    section: InventorySection | null
+  }) | null
+  location: Pick<InventoryLocation, 'id' | 'name'> | null
+}
 
-/** Despacho con material y centro médico embebidos. */
-export type AssignmentRow = InventoryAssignment & {
-  material: { id: string; name: string; unit: string | null } | null;
-  center: { id: string; name: string } | null;
-};
+export type MovementRow = InventoryMovement & {
+  item: (Pick<InventoryItem, 'id' | 'presentacion' | 'stock'> & {
+    subcategory: (Pick<InventorySubcategory, 'id' | 'name'> & {
+      section: Pick<InventorySection, 'id' | 'name'> | null
+    }) | null
+  }) | null
+}
