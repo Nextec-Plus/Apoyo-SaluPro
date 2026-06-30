@@ -3,11 +3,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useToast } from "@/components/toast-provider";
 import type { ItemRow, MovementRow, SectionWithSubcats } from "./types";
+import { CascadeStep, inputCls, inputDisabledCls, labelCls } from "./cascade-step";
 
-const inputCls =
-  "w-full text-sm bg-white border border-border rounded-lg px-3 py-2.5 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-ring focus:border-primary transition-colors";
 const textareaCls = inputCls + " resize-none";
-const labelCls = "block text-xs font-semibold text-gray-700 mb-1";
 
 type SubView = "tablero" | "entrada" | "salida" | "kardex";
 
@@ -15,7 +13,9 @@ export function TabInventario() {
   const toast = useToast();
   const [subView, setSubView] = useState<SubView>("tablero");
   const [items, setItems] = useState<ItemRow[]>([]);
+  const [sections, setSections] = useState<SectionWithSubcats[]>([]);
   const [loadingItems, setLoadingItems] = useState(true);
+  const [loadingSections, setLoadingSections] = useState(true);
 
   const loadItems = useCallback(async () => {
     setLoadingItems(true);
@@ -31,7 +31,24 @@ export function TabInventario() {
     }
   }, [toast]);
 
-  useEffect(() => { loadItems(); }, [loadItems]);
+  const loadSections = useCallback(async () => {
+    setLoadingSections(true);
+    try {
+      const res = await fetch("/api/inventory/sections", { cache: "no-store" });
+      const json = await res.json();
+      if (json.error) throw new Error(json.error);
+      setSections(json.data ?? []);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "No se pudieron cargar las categorías");
+    } finally {
+      setLoadingSections(false);
+    }
+  }, [toast]);
+
+  useEffect(() => {
+    loadItems();
+    loadSections();
+  }, [loadItems, loadSections]);
 
   const subViewOpts: { v: SubView; label: string }[] = [
     { v: "tablero", label: "Tablero" },
@@ -69,10 +86,22 @@ export function TabInventario() {
         <Tablero items={items} loading={loadingItems} />
       )}
       {subView === "entrada" && (
-        <MovimientoForm tipo="entrada" items={items} loading={loadingItems} onCreated={loadItems} />
+        <MovimientoForm
+          tipo="entrada"
+          items={items}
+          sections={sections}
+          loading={loadingItems || loadingSections}
+          onCreated={loadItems}
+        />
       )}
       {subView === "salida" && (
-        <MovimientoForm tipo="salida" items={items} loading={loadingItems} onCreated={loadItems} />
+        <MovimientoForm
+          tipo="salida"
+          items={items}
+          sections={sections}
+          loading={loadingItems || loadingSections}
+          onCreated={loadItems}
+        />
       )}
       {subView === "kardex" && (
         <Kardex items={items} loadingItems={loadingItems} />
@@ -129,7 +158,7 @@ function Tablero({ items, loading }: { items: ItemRow[]; loading: boolean }) {
                     <td className="py-2 px-2">
                       <div className="font-medium text-gray-800">{it.presentacion}</div>
                     </td>
-                    <td className="py-2 px-2 text-gray-500 text-xs">{it.location?.name ?? "—"}</td>
+                    <td className="py-2 px-2 text-gray-500 text-xs">{it.location?.name ?? it.subcategory?.code ?? "—"}</td>
                     <td className="py-2 px-2 text-right">
                       <span className={`font-bold tabular-nums text-sm ${it.stock === 0 ? "text-crisis" : it.stock < 5 ? "text-amber-600" : "text-gray-800"}`}>
                         {it.stock}
@@ -151,11 +180,13 @@ function Tablero({ items, loading }: { items: ItemRow[]; loading: boolean }) {
 function MovimientoForm({
   tipo,
   items,
+  sections,
   loading,
   onCreated,
 }: {
   tipo: "entrada" | "salida";
   items: ItemRow[];
+  sections: SectionWithSubcats[];
   loading: boolean;
   onCreated: () => void;
 }) {
@@ -170,33 +201,72 @@ function MovimientoForm({
   const [nota, setNota] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [sessionCount, setSessionCount] = useState(0);
+  const [showQuickCreate, setShowQuickCreate] = useState(false);
+  const [quickNombre, setQuickNombre] = useState("");
+  const [quickCantidad, setQuickCantidad] = useState("");
+  const [quickCreating, setQuickCreating] = useState(false);
   const cantidadRef = useRef<HTMLInputElement>(null);
 
   const selected = useMemo(() => items.find((it) => it.id === itemId) ?? null, [items, itemId]);
 
-  const sectionsFromItems = useMemo(() => {
-    const map = new Map<string, { id: string; name: string; code: string }>();
-    for (const it of items) {
-      const s = it.subcategory?.section;
-      if (s && !map.has(s.id)) map.set(s.id, { id: s.id, name: s.name, code: s.code ?? `${s.id.slice(0, 4)}` });
-    }
-    return Array.from(map.values());
-  }, [items]);
-
-  const subcategoriesForSection = useMemo(() => {
-    if (!sectionId) return [];
-    const map = new Map<string, { id: string; name: string }>();
-    for (const it of items) {
-      const sc = it.subcategory;
-      if (sc && sc.section?.id === sectionId && !map.has(sc.id)) map.set(sc.id, { id: sc.id, name: sc.name });
-    }
-    return Array.from(map.values());
-  }, [items, sectionId]);
+  const selectedSection = useMemo(
+    () => sections.find((s) => s.id === sectionId) ?? null,
+    [sections, sectionId],
+  );
 
   const filteredItems = useMemo(() => {
     if (!subcategoryId) return [] as ItemRow[];
     return items.filter((it) => it.subcategory?.id === subcategoryId);
   }, [items, subcategoryId]);
+
+  const quickCreate = async () => {
+    const nombre = quickNombre.trim();
+    if (!nombre) return toast.error("El nombre del artículo es obligatorio.");
+    const cant = Number(quickCantidad);
+    if (!Number.isFinite(cant) || cant <= 0) return toast.error("Cantidad inicial debe ser mayor a 0.");
+
+    setQuickCreating(true);
+    try {
+      const res = await fetch("/api/inventory/items", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          subcategory_id: subcategoryId,
+          presentacion: nombre,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok || json.error) {
+        if (res.status === 409) throw new Error("Ya existe un artículo con ese nombre en esta subcategoría.");
+        throw new Error(json.error || "No se pudo crear el artículo");
+      }
+
+      const newItemId = json.data.id;
+      const mvRes = await fetch("/api/inventory/movements", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          item_id: newItemId,
+          tipo: "entrada",
+          cantidad: cant,
+          nota: "Carga inicial rápida",
+        }),
+      });
+      const mvJson = await mvRes.json();
+      if (!mvRes.ok || mvJson.error) throw new Error(mvJson.error || "Artículo creado pero no se pudo registrar la carga.");
+
+      toast.success(`Artículo "${nombre}" creado con ${cant} unidades`);
+      await onCreated();
+      setItemId(newItemId);
+      setShowQuickCreate(false);
+      setQuickNombre("");
+      setQuickCantidad("");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Error inesperado");
+    } finally {
+      setQuickCreating(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -258,67 +328,155 @@ function MovimientoForm({
           : "💡 Registra materiales que salen del centro hacia un destinatario."}
       </p>
 
-      {/* Selectores en cascada: Sección → Subcategoría → Artículo */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <div>
-          <label className={labelCls}>Sección</label>
+      {/* Selectores en cascada: Categoría → Subcategoría → Artículo */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <CascadeStep
+          step={1}
+          label="Categoría"
+          active={!!sectionId}
+          blocked={false}
+        >
           <select
             value={sectionId}
             onChange={(e) => {
               setSectionId(e.target.value);
               setSubcategoryId("");
               setItemId("");
+              setShowQuickCreate(false);
             }}
-            className={inputCls}
+            className={loading ? inputDisabledCls : inputCls}
             disabled={loading}
           >
             <option value="">— Seleccione —</option>
-            {sectionsFromItems.map((s) => (
+            {sections.map((s) => (
               <option key={s.id} value={s.id}>{s.name}</option>
             ))}
           </select>
-        </div>
-        <div>
-          <label className={labelCls}>Subcategoría</label>
+        </CascadeStep>
+
+        <CascadeStep
+          step={2}
+          label="Subcategoría"
+          active={!!subcategoryId}
+          blocked={!sectionId}
+          blockHint="Selecciona primero la categoría"
+          onBlockedClick={() => toast.info("Primero selecciona una categoría")}
+        >
           <select
             value={subcategoryId}
             onChange={(e) => {
               setSubcategoryId(e.target.value);
               setItemId("");
+              setShowQuickCreate(false);
             }}
-            className={inputCls}
+            className={!sectionId ? inputDisabledCls : inputCls}
             disabled={!sectionId}
           >
             <option value="">— Seleccione —</option>
-            {subcategoriesForSection.map((sc) => (
+            {(selectedSection?.subcategories ?? []).map((sc) => (
               <option key={sc.id} value={sc.id}>{sc.name}</option>
             ))}
           </select>
-        </div>
-        <div>
-          <label className={labelCls}>Artículo</label>
+        </CascadeStep>
+
+        <CascadeStep
+          step={3}
+          label="Artículo"
+          active={!!itemId}
+          blocked={!subcategoryId}
+          blockHint="Selecciona primero la subcategoría"
+          onBlockedClick={() => toast.info("Primero selecciona una subcategoría")}
+        >
           <select
             value={itemId}
-            onChange={(e) => setItemId(e.target.value)}
-            className={inputCls}
+            onChange={(e) => {
+              const val = e.target.value;
+              if (val === "__quick_create__") {
+                setShowQuickCreate(true);
+                setItemId("");
+                setTimeout(() => document.getElementById("quick-nombre")?.focus(), 50);
+                return;
+              }
+              setItemId(val);
+              setShowQuickCreate(false);
+            }}
+            className={!subcategoryId ? inputDisabledCls : inputCls}
             disabled={!subcategoryId}
           >
             <option value="">— Seleccione —</option>
             {filteredItems.map((it) => {
-              const disabled = tipo === "salida" && it.stock === 0;
+              const d = tipo === "salida" && it.stock === 0;
               return (
-                <option key={it.id} value={it.id} disabled={disabled}>
+                <option key={it.id} value={it.id} disabled={d}>
                   {it.presentacion}
-                  {tipo === "salida" ? ` (${it.stock} disp.)` : ""}
+                  {tipo === "salida" ? ` (${it.stock} disp.)` : ` (${it.stock})`}
                 </option>
               );
             })}
+            {subcategoryId && (
+              <option value="__quick_create__" className="text-primary font-semibold">
+                + Nuevo artículo
+              </option>
+            )}
           </select>
-        </div>
+        </CascadeStep>
       </div>
+
+      {/* Empty state cuando la subcategoría existe pero no tiene artículos */}
+      {subcategoryId && !itemId && filteredItems.length === 0 && !showQuickCreate && (
+        <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-800 flex items-center gap-2">
+          <span className="text-base">📦</span>
+          <span>No hay artículos en esta subcategoría. Selección <strong>+ Nuevo artículo</strong> en el select de arriba para crear uno.</span>
+        </div>
+      )}
+
+      {/* Quick-create inline */}
+      {showQuickCreate && subcategoryId && (
+        <div className="flex items-end gap-3 bg-primary/5 border border-primary/20 rounded-lg p-3 animate-in fade-in">
+          <div className="flex-1">
+            <label className="block text-[11px] font-semibold text-gray-700 mb-1">Nombre del artículo</label>
+            <input
+              id="quick-nombre"
+              value={quickNombre}
+              onChange={(e) => setQuickNombre(e.target.value)}
+              placeholder="Ej: Jarabe 120ml, Caja × 12..."
+              className={inputCls}
+              onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); quickCreate(); } }}
+            />
+          </div>
+          <div className="w-28">
+            <label className="block text-[11px] font-semibold text-gray-700 mb-1">Cant. inicial</label>
+            <input
+              type="number"
+              min={1}
+              value={quickCantidad}
+              onChange={(e) => setQuickCantidad(e.target.value)}
+              placeholder="1"
+              className={inputCls}
+              onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); quickCreate(); } }}
+            />
+          </div>
+          <button
+            type="button"
+            onClick={quickCreate}
+            disabled={quickCreating}
+            className="bg-primary hover:bg-primary/90 text-white font-bold text-xs px-4 py-2.5 rounded-lg disabled:opacity-60 whitespace-nowrap"
+          >
+            {quickCreating ? "Creando…" : "Crear"}
+          </button>
+          <button
+            type="button"
+            onClick={() => { setShowQuickCreate(false); setQuickNombre(""); setQuickCantidad(""); }}
+            className="text-xs text-gray-400 hover:text-gray-600"
+          >
+            Cancelar
+          </button>
+        </div>
+      )}
+
       {selected && (
         <p className="text-[11px] text-gray-400 mt-1">
-          📍 {selected.location?.name ?? "Sin ubicación asignada"}
+          📍 {selected.location?.name ?? selected.subcategory?.code ?? "Sin ubicación asignada"}
           {tipo === "salida" && <span className="ml-3 font-semibold text-gray-600">Stock: {selected.stock}</span>}
         </p>
       )}
@@ -467,7 +625,7 @@ function Kardex({ items, loadingItems }: { items: ItemRow[]; loadingItems: boole
             <p className="font-semibold text-gray-800 truncate">{selected.presentacion}</p>
             <p className="text-[11px] text-gray-400 truncate">
               {[selected.subcategory?.section?.name, selected.subcategory?.name].filter(Boolean).join(" › ")}
-              {selected.location?.name ? ` · 📍 ${selected.location.name}` : ""}
+              {selected.location?.name ? ` · 📍 ${selected.location.name}` : selected.subcategory?.code ? ` · 📍 ${selected.subcategory.code}` : ""}
             </p>
           </div>
           <div className="text-right shrink-0">
