@@ -22,7 +22,7 @@ const TIPO_STYLE: Record<string, string> = {
   "Centro de acopio":    "bg-orange-100 text-orange-800",
 };
 
-/* ── Sección seleccionada shape ──────────────────────────────────────────── */
+/* ── Categoría seleccionada shape ──────────────────────────────────────────── */
 interface SelSubcat { id: string; name: string; code: string }
 interface SectionItem {
   id: string;

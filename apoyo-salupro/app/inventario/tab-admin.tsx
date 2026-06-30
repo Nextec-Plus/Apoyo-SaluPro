@@ -181,7 +181,7 @@ function ArticulosPanel({
         </p>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
-            <label className={labelCls}>Sección</label>
+            <label className={labelCls}>Categoría</label>
             <select
               value={sectionId}
               onChange={(e) => { setSectionId(e.target.value); setSubcategoryId(""); }}
@@ -282,7 +282,7 @@ function ArticulosPanel({
                       it.presentacion
                     )}
                   </td>
-                  <td className="py-2 px-2 text-xs text-gray-500">{it.location?.name ?? "—"}</td>
+                  <td className="py-2 px-2 text-xs text-gray-500">{it.location?.name ?? it.subcategory?.code ?? "—"}</td>
                   <td className="py-2 px-2 text-right tabular-nums font-semibold text-gray-800">{it.stock}</td>
                   <td className="py-2 px-2 text-right whitespace-nowrap">
                     {editingId !== it.id && (
