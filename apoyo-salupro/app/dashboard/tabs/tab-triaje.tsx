@@ -235,7 +235,7 @@ function PatientCard({
               onChange={(e) => {
                 const next = e.target.value;
                 setDestino(next);
-                if (!isReferidoHospital(next)) setHospital("");
+                setHospital("");
               }}
               disabled={isUpdatingDestino}
               className="w-full text-[11px] rounded border border-border px-2 py-1.5 bg-white text-gray-800"
@@ -246,13 +246,13 @@ function PatientCard({
                 </option>
               ))}
             </select>
-            {isReferidoHospital(destino) && (
+            {(isReferidoHospital(destino) || destino === "Dado de alta (Ambulatorio)") && (
               <input
                 type="text"
                 value={hospital}
                 onChange={(e) => setHospital(e.target.value)}
                 disabled={isUpdatingDestino}
-                placeholder="Hospital / Clínica de destino"
+                placeholder={isReferidoHospital(destino) ? "Hospital / Clínica de destino" : "Referido a hospital (opcional)"}
                 className="w-full text-[11px] rounded border border-border px-2 py-1.5 bg-white text-gray-800 placeholder-gray-400"
               />
             )}
@@ -650,6 +650,23 @@ export function TabTriaje() {
     [],
   );
 
+  useEffect(() => {
+    const AUTO_EGRESO_MS = 30 * 60_000;
+    const autoEgreso = () => {
+      const now = Date.now();
+      for (const caso of casesRef.current) {
+        if (caso.triage_category !== "Verde") continue;
+        const elapsed = now - new Date(caso.fecha_hora_entrada).getTime();
+        if (elapsed >= AUTO_EGRESO_MS) {
+          void updateDestino(caso.id, "Dado de alta (Ambulatorio)", "");
+        }
+      }
+    };
+    autoEgreso();
+    const timer = setInterval(autoEgreso, 60_000);
+    return () => clearInterval(timer);
+  }, [updateDestino]);
+
   const byCategory = useCallback(
     (category: ColumnId) =>
       filteredCases.filter((c) => c.triage_category === category),
@@ -687,7 +704,7 @@ export function TabTriaje() {
           <div>
             <h2 className="text-lg font-bold text-gray-800">Tablero de Triaje</h2>
             <p className="text-xs text-gray-500 mt-0.5">
-              Pacientes en observación en módulo móvil. Arrastra entre columnas para reclasificar o da de alta / traslado.
+              Pacientes en observación en módulo móvil. Los verdes con 30+ min reciben egreso automático.
             </p>
           </div>
           <button

@@ -2,13 +2,15 @@ import type { NextRequest } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { isReferidoHospitalNotas, parseDestino, REFERIDO_HOSPITAL, DESTINOS } from '@/lib/catastrophe-destinos'
 
+const TERMINAL = "Terminal de Pasajeros Catia La Mar"
+
 export async function POST(request: NextRequest) {
   const supabase = await createServiceClient()
   const { searchParams } = request.nextUrl
   const organization_id = searchParams.get('organization_id')
 
   // Fetch all found matches with victim location data
-  let query = supabase
+  const { data: matches, error } = await supabase
     .from('missing_person_found')
     .select(
       `
@@ -21,8 +23,6 @@ export async function POST(request: NextRequest) {
       )
     `,
     )
-
-  const { data: matches, error } = await query
 
   if (error) return Response.json({ error: error.message }, { status: 500 })
   if (!matches?.length) return Response.json({ updated: 0 })
@@ -48,7 +48,10 @@ export async function POST(request: NextRequest) {
       } else {
         const { destino } = parseDestino(victim.notas)
         if ((DESTINOS as readonly string[]).includes(destino)) {
-          newLocation = destino
+          const esObservacionOAlta =
+            destino === "En observación en módulo móvil" ||
+            destino === "Dado de alta (Ambulatorio)"
+          newLocation = esObservacionOAlta ? `${destino} — ${TERMINAL}` : destino
         }
       }
     }

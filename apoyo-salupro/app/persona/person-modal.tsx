@@ -23,9 +23,9 @@ function formatFoundLocation(lugar: string | null | undefined): { icon: string; 
     const { hospital } = parseDestino(lugar);
     return { icon: "🏥", text: hospital || "Hospital" };
   }
-  if (lugar === OBSERVACION_MODULO_MOVIL) return { icon: "🩺", text: "En observación en módulo móvil" };
-  if (lugar === "Dado de alta (Ambulatorio)") return { icon: "✅", text: "Dado de alta (Ambulatorio)" };
-  if (lugar === "Trasladado a Refugio Oficial") return { icon: "🏠", text: "Trasladado a Refugio Oficial" };
+  if (lugar.startsWith(OBSERVACION_MODULO_MOVIL)) return { icon: "🩺", text: lugar };
+  if (lugar.startsWith("Dado de alta (Ambulatorio)")) return { icon: "✅", text: lugar };
+  if (lugar === "Trasladado a Refugio Oficial") return { icon: "🏠", text: lugar };
   return { icon: "📍", text: lugar };
 }
 
