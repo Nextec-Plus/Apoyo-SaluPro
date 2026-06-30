@@ -4,8 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import { useToast } from "@/components/toast-provider";
 import type { InsertMissingPerson } from "@/lib/types/database";
 import type { MissingPersonSearchItem } from "@/lib/search/types";
-import { missingPersonsConfig } from "@/lib/search/configs";
-import { SearchProvider } from "@/components/search/SearchProvider";
+import { missingPersonsConfig, type MissingPersonsFilters } from "@/lib/search/configs";
+import { SearchProvider, useSearch } from "@/components/search/SearchProvider";
 import {
   ActiveChips,
   FilterPanel,
@@ -40,54 +40,70 @@ function Field({ label, required, children }: { label: string; required?: boolea
 
 /* ── Tarjetas de estadísticas (datos reales del endpoint /stats) ─────────── */
 
-type Stats = { total: number; busquedas: number; encontradas: number };
+type Stats = { total: number; busquedas: number; encontradas: number; fallecidas: number };
 
-function StatCards({ stats, loading }: { stats: Stats; loading: boolean }) {
-  const cards = [
-    { v: stats.total, label: "Personas registradas", color: "text-gray-900", ring: "border-border" },
-    { v: stats.busquedas, label: "Aún buscadas", color: "text-crisis", ring: "border-crisis/20" },
-    { v: stats.encontradas, label: "Encontradas", color: "text-triage-green", ring: "border-triage-green/25" },
+/** Estado por el que se filtra el listado al pulsar una tarjeta de estadística. */
+type SectionFilter = "todos" | "Desaparecido" | "Encontrado" | "Confirmado Fallecido";
+
+function StatCards({
+  stats,
+  loading,
+  active,
+  onSelect,
+}: {
+  stats: Stats;
+  loading: boolean;
+  active: SectionFilter;
+  onSelect: (f: SectionFilter) => void;
+}) {
+  const cards: {
+    v: number;
+    label: string;
+    color: string;
+    ring: string;
+    filter: SectionFilter;
+  }[] = [
+    { v: stats.total, label: "Personas registradas", color: "text-gray-900", ring: "border-border", filter: "todos" },
+    { v: stats.busquedas, label: "Aún buscadas", color: "text-crisis", ring: "border-crisis/20", filter: "Desaparecido" },
+    { v: stats.encontradas, label: "Encontradas", color: "text-triage-green", ring: "border-triage-green/25", filter: "Encontrado" },
+    { v: stats.fallecidas, label: "Fallecidas", color: "text-gray-600", ring: "border-gray-300", filter: "Confirmado Fallecido" },
   ];
   return (
-    <div className="grid grid-cols-3 gap-2.5 sm:gap-3 mb-5">
-      {cards.map((c) => (
-        <div key={c.label} className={`rounded-xl border bg-white px-3 py-3 sm:px-4 sm:py-3.5 shadow-sm ${c.ring}`}>
-          <div className={`font-display text-xl sm:text-3xl font-extrabold tabular-nums ${c.color}`}>
-            {loading ? "—" : c.v.toLocaleString("es-VE")}
-          </div>
-          <div className="mt-0.5 text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider text-gray-500 leading-tight">
-            {c.label}
-          </div>
-        </div>
-      ))}
+    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3 mb-5">
+      {cards.map((c) => {
+        const isActive = active === c.filter;
+        return (
+          <button
+            key={c.label}
+            type="button"
+            onClick={() => onSelect(c.filter)}
+            aria-pressed={isActive}
+            className={`text-left rounded-xl border bg-white px-3 py-3 sm:px-4 sm:py-3.5 shadow-sm transition-all ${c.ring} ${
+              isActive ? "ring-2 ring-primary/40 border-primary/50" : "hover:border-gray-300 hover:shadow"
+            }`}
+          >
+            <div className={`font-display text-xl sm:text-3xl font-extrabold tabular-nums ${c.color}`}>
+              {loading ? "—" : c.v.toLocaleString("es-VE")}
+            </div>
+            <div className="mt-0.5 text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider text-gray-500 leading-tight">
+              {c.label}
+            </div>
+          </button>
+        );
+      })}
     </div>
   );
 }
 
 /* ── Listado de registros (grid de cards, mismo motor que la landing) ────── */
 
-function RegistrosList({ reloadToken }: { reloadToken: number }) {
+/** Grid + modal de gestión. Vive DENTRO del SearchProvider para poder
+ *  recargar el listado en sitio tras un cambio de estado. */
+function RegistrosResults({ onChanged }: { onChanged: () => void }) {
   const [selected, setSelected] = useState<PersonModalPerson | null>(null);
+  const { reload } = useSearch<MissingPersonSearchItem, MissingPersonsFilters>();
   return (
-    // key fuerza un re-fetch limpio cuando se emite un nuevo reporte.
-    <SearchProvider key={reloadToken} config={missingPersonsConfig}>
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-        <div className="w-full sm:max-w-sm">
-          <SearchBar placeholder="Buscar por nombre, apellido o cédula…" accent="primary" />
-        </div>
-        <div className="flex items-end gap-3">
-          <FilterPanel layout="inline" />
-        </div>
-      </div>
-
-      <div className="mt-3 flex items-center justify-between gap-2">
-        <ActiveChips />
-        <ResultCount
-          loadingLabel="Cargando…"
-          formatter={(c) => `${c} resultado${c !== 1 ? "s" : ""}`}
-        />
-      </div>
-
+    <>
       <div className="mt-4">
         <ResultsGrid
           columns="sm:grid-cols-2 lg:grid-cols-3"
@@ -106,19 +122,76 @@ function RegistrosList({ reloadToken }: { reloadToken: number }) {
         <ResultsState emptyTitle="Ningún registro coincide con tu búsqueda." />
       </div>
 
-      {selected && <PersonModal person={selected} onClose={() => setSelected(null)} />}
+      {selected && (
+        <PersonModal
+          key={selected.id}
+          person={selected}
+          manage
+          onClose={() => setSelected(null)}
+          onChanged={() => {
+            reload(); // refresca el listado en sitio
+            onChanged(); // refresca los contadores
+          }}
+        />
+      )}
+    </>
+  );
+}
+
+function RegistrosList({
+  reloadToken,
+  estado,
+  onChanged,
+}: {
+  reloadToken: number;
+  estado: SectionFilter;
+  onChanged: () => void;
+}) {
+  return (
+    // key fuerza un re-fetch limpio al emitir un nuevo reporte o cambiar de sección.
+    <SearchProvider
+      key={`${reloadToken}-${estado}`}
+      config={missingPersonsConfig}
+      initialFilters={{ estado }}
+    >
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div className="w-full sm:max-w-sm">
+          <SearchBar placeholder="Buscar por nombre, apellido o cédula…" accent="primary" />
+        </div>
+        <div className="flex items-end gap-3">
+          <FilterPanel layout="inline" />
+        </div>
+      </div>
+
+      <div className="mt-3 flex items-center justify-between gap-2">
+        <ActiveChips />
+        <ResultCount
+          loadingLabel="Cargando…"
+          formatter={(c) => `${c} resultado${c !== 1 ? "s" : ""}`}
+        />
+      </div>
+
+      <RegistrosResults onChanged={onChanged} />
     </SearchProvider>
   );
 }
 
+type RegistroTipo = "desaparecida" | "fallecida";
+
 export function TabDesaparecidos() {
   const toast = useToast();
   const [view, setView] = useState<"reportar" | "registros">("reportar");
+  const [tipo, setTipo] = useState<RegistroTipo>("desaparecida");
   const [reloadToken, setReloadToken] = useState(0);
+  // Sección activa del listado (filtro por estado, controlada por las tarjetas).
+  const [section, setSection] = useState<SectionFilter>("todos");
 
   /* ── Estadísticas globales ─────────────────────────────────────────── */
-  const [stats, setStats] = useState<Stats>({ total: 0, busquedas: 0, encontradas: 0 });
+  const [stats, setStats] = useState<Stats>({ total: 0, busquedas: 0, encontradas: 0, fallecidas: 0 });
   const [statsLoading, setStatsLoading] = useState(true);
+  // Token independiente para refrescar SOLO los contadores (sin remmontar el
+  // listado) tras un cambio de estado hecho desde el modal de gestión.
+  const [statsToken, setStatsToken] = useState(0);
 
   useEffect(() => {
     let active = true;
@@ -134,7 +207,7 @@ export function TabDesaparecidos() {
     return () => {
       active = false;
     };
-  }, [reloadToken]);
+  }, [reloadToken, statsToken]);
 
   /* ── Formulario ────────────────────────────────────────────────────── */
   const formRef = useRef<HTMLFormElement>(null);
@@ -152,6 +225,7 @@ export function TabDesaparecidos() {
     formRef.current?.reset();
     setPreview(null);
     setFormError("");
+    setTipo("desaparecida");
   };
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -169,10 +243,14 @@ export function TabDesaparecidos() {
       return v ? Number(v) : null;
     };
 
+    const esFallecida = tipo === "fallecida";
+
     const nombre = (fd.get("nombre") as string)?.trim();
     const apellido = (fd.get("apellido") as string)?.trim();
     if (!nombre || !apellido) {
-      const msg = "El nombre y el apellido de la persona desaparecida son obligatorios.";
+      const msg = esFallecida
+        ? "El nombre y el apellido de la persona fallecida son obligatorios."
+        : "El nombre y el apellido de la persona desaparecida son obligatorios.";
       setFormError(msg);
       toast.error(msg);
       setSubmitting(false);
@@ -185,7 +263,10 @@ export function TabDesaparecidos() {
       cedula: str("cedula"),
       edad_aproximada: num("edad_aproximada"),
       genero: str("genero"),
-      ultimo_lugar_visto: str("ultimo_lugar_visto"),
+      // Según el tipo: lugar visto (desaparecida) o motivo (fallecida, opcional).
+      ultimo_lugar_visto: esFallecida ? null : str("ultimo_lugar_visto"),
+      motivo_fallecimiento: esFallecida ? str("motivo_fallecimiento") : null,
+      estado: esFallecida ? "Confirmado Fallecido" : "Desaparecido",
       informacion_adicional: str("informacion_adicional"),
       // Contacto (familiar) — todos opcionales. Un único nombre y teléfono.
       contacto_nombre: str("contacto_nombre") ?? "",
@@ -202,7 +283,10 @@ export function TabDesaparecidos() {
         body: JSON.stringify(body),
       });
       const json = await res.json();
-      if (!res.ok || json.error) throw new Error(json.error || "No se pudo emitir la alerta");
+      if (!res.ok || json.error)
+        throw new Error(
+          json.error || (esFallecida ? "No se pudo registrar el fallecimiento" : "No se pudo emitir la alerta"),
+        );
 
       const id: string = json.data.id;
 
@@ -222,10 +306,22 @@ export function TabDesaparecidos() {
         }
       }
 
-      toast.success("Alerta emitida — el reporte quedó registrado.");
+      // El backend avisa si la cédula ya estaba reportada como desaparecida:
+      // en ese caso se actualizó ese mismo registro a "Confirmado Fallecido".
+      const matched = json.matched_missing as { nombre: string; apellido: string } | null;
+      if (matched) {
+        toast.success(
+          `⚠️ ${matched.nombre} ${matched.apellido} estaba reportada como DESAPARECIDA. Su registro se actualizó a fallecida.`,
+        );
+      } else if (esFallecida) {
+        toast.success("Fallecimiento registrado correctamente.");
+      } else {
+        toast.success("Alerta emitida — el reporte quedó registrado.");
+      }
       resetForm();
+      setSection("todos"); // el nuevo reporte debe verse sin filtro de sección
       setReloadToken((t) => t + 1); // refresca stats + listado
-      setView("registros");
+      if (!esFallecida) setView("registros");
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Error inesperado";
       setFormError(msg);
@@ -269,10 +365,37 @@ export function TabDesaparecidos() {
 
       {view === "reportar" ? (
         <form ref={formRef} onSubmit={handleSubmit} className="space-y-6">
-          {/* 1. Persona desaparecida */}
+          {/* Tipo de registro: desaparecida o fallecida (solo interno) */}
+          <div className="grid grid-cols-2 gap-2 rounded-lg bg-muted p-1">
+            {([
+              { v: "desaparecida", label: "Persona desaparecida" },
+              { v: "fallecida", label: "Persona fallecida" },
+            ] as const).map((opt) => {
+              const active = tipo === opt.v;
+              const accent =
+                opt.v === "fallecida" ? "text-gray-800" : "text-primary";
+              return (
+                <button
+                  key={opt.v}
+                  type="button"
+                  onClick={() => setTipo(opt.v)}
+                  aria-pressed={active}
+                  className={`text-sm font-semibold px-3.5 py-2 rounded-md transition-colors ${
+                    active ? `bg-white shadow-sm ${accent}` : "text-gray-500 hover:text-gray-800"
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* 1. Datos de la persona */}
           <section className="bg-muted rounded-lg border border-border p-4 space-y-4">
             <h3 className="text-[11px] font-bold uppercase tracking-widest text-gray-400">
-              1. Datos de la persona desaparecida
+              {tipo === "fallecida"
+                ? "1. Datos de la persona fallecida"
+                : "1. Datos de la persona desaparecida"}
             </h3>
 
             <div className="flex flex-col sm:flex-row gap-5">
@@ -321,9 +444,19 @@ export function TabDesaparecidos() {
               </div>
             </div>
 
-            <Field label="Último lugar visto">
-              <input name="ultimo_lugar_visto" placeholder="Ej: Macuto, cerca del malecón" className={inputCls} />
-            </Field>
+            {tipo === "fallecida" ? (
+              <Field label="Motivo de fallecimiento (opcional)">
+                <input
+                  name="motivo_fallecimiento"
+                  placeholder="Ej: Causas naturales, accidente…"
+                  className={inputCls}
+                />
+              </Field>
+            ) : (
+              <Field label="Último lugar visto">
+                <input name="ultimo_lugar_visto" placeholder="Ej: Macuto, cerca del malecón" className={inputCls} />
+              </Field>
+            )}
             <Field label="Información adicional">
               <textarea
                 name="informacion_adicional"
@@ -368,13 +501,31 @@ export function TabDesaparecidos() {
             disabled={submitting}
             className="w-full bg-gray-800 hover:bg-gray-900 text-white font-bold py-3.5 rounded-lg shadow-sm transition-colors text-sm tracking-wide disabled:opacity-60 disabled:cursor-not-allowed"
           >
-            {submitting ? "EMITIENDO…" : "EMITIR ALERTA DE BÚSQUEDA"}
+            {submitting
+              ? tipo === "fallecida"
+                ? "REGISTRANDO…"
+                : "EMITIENDO…"
+              : tipo === "fallecida"
+                ? "REGISTRAR FALLECIMIENTO"
+                : "EMITIR ALERTA DE BÚSQUEDA"}
           </button>
         </form>
       ) : (
         <div>
-          <StatCards stats={stats} loading={statsLoading} />
-          <RegistrosList reloadToken={reloadToken} />
+          <StatCards
+            stats={stats}
+            loading={statsLoading}
+            active={section}
+            onSelect={(f) => {
+              setSection(f);
+              setView("registros");
+            }}
+          />
+          <RegistrosList
+            reloadToken={reloadToken}
+            estado={section}
+            onChanged={() => setStatsToken((t) => t + 1)}
+          />
         </div>
       )}
     </div>

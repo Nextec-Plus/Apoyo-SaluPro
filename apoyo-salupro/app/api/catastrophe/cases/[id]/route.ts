@@ -9,6 +9,8 @@ interface UpdateCaseBody {
   condiciones_preexistentes?: string
   alergias?: string
   tratamiento_medicamentos?: string
+  /** Actualiza catastrophe_victims.notas en la misma operación (p. ej. alta/traslado). */
+  notas?: string | null
 }
 
 export async function GET(
@@ -49,14 +51,58 @@ export async function PATCH(
     )
   }
 
+  const { notas, ...caseFields } = body
+
+  const { data: existing, error: fetchError } = await supabase
+    .from('catastrophe_victim_info')
+    .select('victim_id')
+    .eq('id', id)
+    .single()
+
+  if (fetchError) {
+    const status = fetchError.code === 'PGRST116' ? 404 : 500
+    return Response.json({ data: null, error: fetchError.message }, { status })
+  }
+
+  let previousNotas: string | null | undefined
+  if (notas !== undefined) {
+    const { data: victim, error: victimFetchError } = await supabase
+      .from('catastrophe_victims')
+      .select('notas')
+      .eq('id', existing.victim_id)
+      .single()
+
+    if (victimFetchError) {
+      const status = victimFetchError.code === 'PGRST116' ? 404 : 500
+      return Response.json({ data: null, error: victimFetchError.message }, { status })
+    }
+
+    previousNotas = victim.notas
+
+    const { error: victimUpdateError } = await supabase
+      .from('catastrophe_victims')
+      .update({ notas })
+      .eq('id', existing.victim_id)
+
+    if (victimUpdateError) {
+      return Response.json({ data: null, error: victimUpdateError.message }, { status: 500 })
+    }
+  }
+
   const { data, error } = await supabase
     .from('catastrophe_victim_info')
-    .update(body)
+    .update(caseFields)
     .eq('id', id)
     .select('*, catastrophe_victims(*)')
     .single()
 
   if (error) {
+    if (notas !== undefined && previousNotas !== undefined) {
+      await supabase
+        .from('catastrophe_victims')
+        .update({ notas: previousNotas })
+        .eq('id', existing.victim_id)
+    }
     const status = error.code === 'PGRST116' ? 404 : 500
     return Response.json({ data: null, error: error.message }, { status })
   }

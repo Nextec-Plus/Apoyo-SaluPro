@@ -1,10 +1,22 @@
 import type { NextRequest } from 'next/server'
-import { createServiceClient } from '@/lib/supabase/server'
+import { createClient } from '@/lib/supabase/server'
 import { getOrganizationId } from '@/lib/config'
+import {
+  applyMissingPersonSearch,
+  hasSearchIndex,
+} from '@/lib/missing-persons-search'
 import type {
   InsertMissingPerson,
   MissingPersonStatus,
 } from '@/lib/types/database'
+
+/**
+ * Tope de filas del modo legacy (GET sin `limit`). El modo legacy es interno y
+ * está deprecado: devolvía la tabla entera (2000+ filas), una bomba de
+ * memoria/latencia. Los consumidores reales usan paginación; este tope acota
+ * cualquier llamada legacy residual.
+ */
+const LEGACY_MAX_ROWS = 1000
 
 /**
  * GET /api/missing-persons
@@ -29,7 +41,9 @@ import type {
  *  - Cursor compuesto (created_at,id) → sin saltos ni duplicados en empates.
  */
 export async function GET(request: NextRequest) {
-  const supabase = await createServiceClient()
+  // Cliente anónimo: el listado público está protegido por RLS (select público).
+  // No usamos service_role en rutas públicas para no bypassar RLS.
+  const supabase = await createClient()
   const { searchParams } = request.nextUrl
 
   const organization_id = searchParams.get('organization_id')
@@ -43,30 +57,36 @@ export async function GET(request: NextRequest) {
 
   // Columnas ligeras compartidas por los modos paginados (1 imagen por persona).
   const LIST_COLUMNS =
-    'id, organization_id, nombre, apellido, cedula, edad_aproximada, genero, ultimo_lugar_visto, informacion_adicional, estado, contacto_nombre, contacto_apellido, contacto_correo, contacto_telefono_nacional, contacto_telefono_internacional, created_at, updated_at, missing_person_images!missing_person_images_missing_person_id_fkey(storage_path)'
+    'id, organization_id, nombre, apellido, cedula, edad_aproximada, genero, ultimo_lugar_visto, informacion_adicional, estado, motivo_fallecimiento, fallecimiento_confirmado, contacto_nombre, contacto_apellido, contacto_correo, contacto_telefono_nacional, contacto_telefono_internacional, created_at, updated_at, has_image, missing_person_images!missing_person_images_missing_person_id_fkey(storage_path)'
+
+  // ¿Está disponible la columna acento-insensible `search_index` (migración 006)?
+  // Sólo se comprueba cuando hay término de búsqueda libre.
+  const useIndex = search ? await hasSearchIndex(supabase) : false
 
   // Aplica los filtros comunes (search/estado/cedula/organization) a un query.
+  // La búsqueda de texto se delega al núcleo compartido: tokeniza por palabras,
+  // sanea contra inyección de PostgREST y usa search_index cuando existe.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- builder de PostgREST
   const applyFilters = (q: any): any => {
     let query = q
     if (organization_id) query = query.eq('organization_id', organization_id)
     if (estado) query = query.eq('estado', estado)
     if (cedula) query = query.eq('cedula', cedula)
-    if (search) {
-      query = query.or(
-        `nombre.ilike.%${search}%,apellido.ilike.%${search}%,cedula.ilike.%${search}%`,
-      )
-    }
+    if (search) query = applyMissingPersonSearch(query, search, useIndex)
     return query
   }
 
-  // ── Modo legacy (sin paginación) ─────────────────────────────────────────
+  // ── Modo legacy (DEPRECADO / interno) ────────────────────────────────────
+  // No pagina; topado a LEGACY_MAX_ROWS para no devolver la tabla entera.
   if (limitParam === null) {
     const query = applyFilters(
       supabase
         .from('missing_persons')
         .select('*, missing_person_images(*)')
-        .order('created_at', { ascending: false }),
+        // Estético: primero quienes tienen foto cargada, luego los más recientes.
+        .order('has_image', { ascending: false })
+        .order('created_at', { ascending: false })
+        .limit(LEGACY_MAX_ROWS),
     )
 
     const { data, error } = await query
@@ -88,6 +108,8 @@ export async function GET(request: NextRequest) {
       supabase
         .from('missing_persons')
         .select(LIST_COLUMNS, { count: 'exact' })
+        // Estético: primero quienes tienen foto cargada, luego los más recientes.
+        .order('has_image', { ascending: false })
         .order('created_at', { ascending: false })
         .order('id', { ascending: false })
         .range(from, to),
@@ -118,20 +140,29 @@ export async function GET(request: NextRequest) {
     supabase
       .from('missing_persons')
       .select(LIST_COLUMNS)
+      // Estético: primero quienes tienen foto cargada, luego los más recientes.
+      .order('has_image', { ascending: false })
       .order('created_at', { ascending: false })
       .order('id', { ascending: false })
       .limit(limit),
   )
 
-  // Cursor compuesto: created_at,id (formato: ISO,cadena-id).
+  // Cursor compuesto: has_image,created_at,id (formato: bool,ISO,cadena-id).
+  // El orden primario es has_image DESC (true antes que false), así que el
+  // keyset debe arrastrar también ese campo para no saltarse filas.
   if (cursor) {
-    const sep = cursor.lastIndexOf(',')
-    if (sep > 0) {
-      const cursorDate = cursor.slice(0, sep)
-      const cursorId = cursor.slice(sep + 1)
-      // (created_at < cursorDate) OR (created_at = cursorDate AND id < cursorId)
+    const firstComma = cursor.indexOf(',')
+    const lastComma = cursor.lastIndexOf(',')
+    if (firstComma > 0 && lastComma > firstComma) {
+      const cursorHasImg = cursor.slice(0, firstComma) // 'true' | 'false'
+      const cursorDate = cursor.slice(firstComma + 1, lastComma)
+      const cursorId = cursor.slice(lastComma + 1)
+      // (has_image < h) OR (has_image = h AND created_at < date) OR
+      // (has_image = h AND created_at = date AND id < id)
       query = query.or(
-        `created_at.lt.${cursorDate},and(created_at.eq.${cursorDate},id.lt.${cursorId})`,
+        `has_image.lt.${cursorHasImg},` +
+          `and(has_image.eq.${cursorHasImg},created_at.lt.${cursorDate}),` +
+          `and(has_image.eq.${cursorHasImg},created_at.eq.${cursorDate},id.lt.${cursorId})`,
       )
     }
   }
@@ -144,13 +175,14 @@ export async function GET(request: NextRequest) {
   const items = (data ?? []) as Array<{
     id: string
     created_at: string
+    has_image: boolean
     [k: string]: unknown
   } & { missing_person_images?: Array<{ storage_path: string }> }>
 
   const last = items[items.length - 1]
   const next_cursor =
     items.length === limit && last
-      ? `${last.created_at},${last.id}`
+      ? `${last.has_image},${last.created_at},${last.id}`
       : null
 
   // Cache pública breve en CDN/edge para absorber picos de 2000 usuarios.
@@ -165,7 +197,9 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const supabase = await createServiceClient()
+  // Reporte público: cliente anónimo para que RLS aplique (insert público
+  // permitido por policy). No usamos service_role aquí para no bypassar RLS.
+  const supabase = await createClient()
 
   let body: InsertMissingPerson
   try {
@@ -194,12 +228,68 @@ export async function POST(request: NextRequest) {
 
   // Los datos de contacto son opcionales. Las columnas contacto_nombre/apellido son
   // NOT NULL en la base de datos, así que normalizamos los ausentes a cadena vacía.
+  // `fallecimiento_confirmado` lo controla el servidor (no se confía en el cliente):
+  // solo se marca TRUE cuando se confirma una desaparición previa más abajo.
+  const cedula = body.cedula?.trim() || null
   const insert: InsertMissingPerson = {
     ...body,
     nombre,
     apellido,
+    cedula,
     contacto_nombre: body.contacto_nombre?.trim() || '',
     contacto_apellido: body.contacto_apellido?.trim() || '',
+    fallecimiento_confirmado: false,
+  }
+
+  // ── Confirmación de fallecimiento sobre una desaparición previa ───────────
+  // Si se registra una persona como fallecida (estado 'Confirmado Fallecido') y
+  // su cédula ya estaba reportada como Desaparecida/Avistada, NO se duplica:
+  // se actualiza ese registro a fallecido y se avisa al cliente con
+  // `matched_missing` para que muestre la alerta correspondiente.
+  if (insert.estado === 'Confirmado Fallecido' && cedula) {
+    const { data: existing, error: lookupError } = await supabase
+      .from('missing_persons')
+      .select('id, nombre, apellido')
+      .eq('cedula', cedula)
+      .in('estado', ['Desaparecido', 'Avistado'])
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    if (lookupError) {
+      return Response.json({ data: null, error: lookupError.message }, { status: 500 })
+    }
+
+    if (existing) {
+      const { data: updated, error: updateError } = await supabase
+        .from('missing_persons')
+        .update({
+          estado: 'Confirmado Fallecido',
+          motivo_fallecimiento: insert.motivo_fallecimiento ?? null,
+          informacion_adicional: insert.informacion_adicional ?? undefined,
+          fallecimiento_confirmado: true,
+        })
+        .eq('id', existing.id)
+        .select()
+        .single()
+
+      if (updateError) {
+        return Response.json({ data: null, error: updateError.message }, { status: 500 })
+      }
+
+      return Response.json(
+        {
+          data: updated,
+          matched_missing: {
+            id: existing.id,
+            nombre: existing.nombre,
+            apellido: existing.apellido,
+          },
+          error: null,
+        },
+        { status: 200 },
+      )
+    }
   }
 
   const { data, error } = await supabase
@@ -209,5 +299,5 @@ export async function POST(request: NextRequest) {
     .single()
 
   if (error) return Response.json({ data: null, error: error.message }, { status: 500 })
-  return Response.json({ data, error: null }, { status: 201 })
+  return Response.json({ data, matched_missing: null, error: null }, { status: 201 })
 }

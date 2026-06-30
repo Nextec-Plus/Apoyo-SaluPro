@@ -243,6 +243,8 @@ export type Database = {
           ultimo_lugar_visto: string | null
           informacion_adicional: string | null
           estado: Database["public"]["Enums"]["missing_person_status"]
+          motivo_fallecimiento: string | null
+          fallecimiento_confirmado: boolean
           contacto_nombre: string
           contacto_apellido: string
           contacto_correo: string | null
@@ -250,6 +252,9 @@ export type Database = {
           contacto_telefono_internacional: string | null
           created_at: string
           updated_at: string
+          search_index: string | null
+          origen_url: string | null
+          has_image: boolean
         }
         Insert: {
           id?: string
@@ -262,6 +267,8 @@ export type Database = {
           ultimo_lugar_visto?: string | null
           informacion_adicional?: string | null
           estado?: Database["public"]["Enums"]["missing_person_status"]
+          motivo_fallecimiento?: string | null
+          fallecimiento_confirmado?: boolean
           contacto_nombre: string
           contacto_apellido: string
           contacto_correo?: string | null
@@ -269,6 +276,8 @@ export type Database = {
           contacto_telefono_internacional?: string | null
           created_at?: string
           updated_at?: string
+          origen_url?: string | null
+          has_image?: boolean
         }
         Update: {
           id?: string
@@ -281,6 +290,8 @@ export type Database = {
           ultimo_lugar_visto?: string | null
           informacion_adicional?: string | null
           estado?: Database["public"]["Enums"]["missing_person_status"]
+          motivo_fallecimiento?: string | null
+          fallecimiento_confirmado?: boolean
           contacto_nombre?: string
           contacto_apellido?: string
           contacto_correo?: string | null
@@ -288,6 +299,8 @@ export type Database = {
           contacto_telefono_internacional?: string | null
           created_at?: string
           updated_at?: string
+          origen_url?: string | null
+          has_image?: boolean
         }
         Relationships: []
       }

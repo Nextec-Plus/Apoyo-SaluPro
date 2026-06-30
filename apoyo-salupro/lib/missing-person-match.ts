@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database, MissingPersonMatchType } from '@/lib/types/database'
+import { isReferidoHospitalNotas, parseDestino, REFERIDO_HOSPITAL, DESTINOS } from '@/lib/catastrophe-destinos'
 
 type ServiceClient = SupabaseClient<Database>
 
@@ -44,6 +45,7 @@ export async function syncMissingPersonMatches(
     nombre_completo: string
     cedula: string | null
     ubicacion_actual_refugio?: string | null
+    notas?: string | null
   },
 ): Promise<FoundMatchResult[]> {
   const normCedula = normalizeCedula(victim.cedula)
@@ -90,13 +92,36 @@ export async function syncMissingPersonMatches(
 
     const created = !insertError
 
-    if (person.estado !== 'Encontrado') {
-      const update: { estado: 'Encontrado'; ultimo_lugar_visto?: string } = {
-        estado: 'Encontrado',
+    const TERMINAL = "Terminal de Pasajeros Catia La Mar"
+    const locationUpdate: { ultimo_lugar_visto?: string } = {}
+    if (victim.notas?.trim()) {
+      if (isReferidoHospitalNotas(victim.notas)) {
+        const { hospital } = parseDestino(victim.notas)
+        locationUpdate.ultimo_lugar_visto = hospital
+          ? `${REFERIDO_HOSPITAL} — ${hospital}`
+          : REFERIDO_HOSPITAL
+      } else {
+        const { destino } = parseDestino(victim.notas)
+        if ((DESTINOS as readonly string[]).includes(destino)) {
+          const esObservacionOAlta =
+            destino === "En observación en módulo móvil" ||
+            destino === "Dado de alta (Ambulatorio)"
+          locationUpdate.ultimo_lugar_visto = esObservacionOAlta
+            ? `${destino} — ${TERMINAL}`
+            : destino
+        }
       }
-      if (victim.ubicacion_actual_refugio?.trim()) {
-        update.ultimo_lugar_visto = victim.ubicacion_actual_refugio.trim()
-      }
+    }
+    if (!locationUpdate.ultimo_lugar_visto && victim.ubicacion_actual_refugio?.trim()) {
+      locationUpdate.ultimo_lugar_visto = victim.ubicacion_actual_refugio.trim()
+    }
+
+    const needsEstadoUpdate = person.estado !== 'Encontrado'
+    const hasLocationUpdate = locationUpdate.ultimo_lugar_visto !== undefined
+
+    if (needsEstadoUpdate || hasLocationUpdate) {
+      const update: { estado?: 'Encontrado'; ultimo_lugar_visto?: string } = { ...locationUpdate }
+      if (needsEstadoUpdate) update.estado = 'Encontrado'
       await supabase.from('missing_persons').update(update).eq('id', person.id)
     }
 

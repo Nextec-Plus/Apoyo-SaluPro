@@ -8,6 +8,26 @@ import {
   STATUS_META,
 } from "@/lib/missing-persons";
 import type { MissingPersonSearchItem } from "@/lib/search/types";
+import type { MissingPersonStatus } from "@/lib/types/database";
+import { useToast } from "@/components/toast-provider";
+import {
+  isReferidoHospitalNotas,
+  parseDestino,
+  REFERIDO_HOSPITAL,
+  OBSERVACION_MODULO_MOVIL,
+} from "@/lib/catastrophe-destinos";
+
+function formatFoundLocation(lugar: string | null | undefined): { icon: string; text: string } {
+  if (!lugar) return { icon: "", text: "" };
+  if (isReferidoHospitalNotas(lugar)) {
+    const { hospital } = parseDestino(lugar);
+    return { icon: "🏥", text: hospital || "Hospital" };
+  }
+  if (lugar.startsWith(OBSERVACION_MODULO_MOVIL)) return { icon: "🩺", text: lugar };
+  if (lugar.startsWith("Dado de alta (Ambulatorio)")) return { icon: "✅", text: lugar };
+  if (lugar === "Trasladado a Refugio Oficial") return { icon: "🏠", text: lugar };
+  return { icon: "📍", text: lugar };
+}
 
 function Field({ label, value }: { label: string; value?: string | number | null }) {
   if (value === null || value === undefined || value === "") return null;
@@ -25,13 +45,75 @@ export type PersonModalPerson = MissingPersonWithImages | MissingPersonSearchIte
 export function PersonModal({
   person,
   onClose,
+  manage = false,
+  publicFound = false,
+  onChanged,
 }: {
   person: PersonModalPerson;
   onClose: () => void;
+  /** Habilita las acciones de gestión (solo vista interna, post-login). */
+  manage?: boolean;
+  /**
+   * Habilita la acción pública (sin login) de marcar como encontrada con una
+   * nota opcional. Pensada para las vistas externas (landing, desaparecidos).
+   */
+  publicFound?: boolean;
+  /** Se invoca tras un cambio de estado para refrescar el listado/contadores. */
+  onChanged?: () => void;
 }) {
-  const m = STATUS_META[person.estado];
+  // El estado se mantiene en local para reflejar de inmediato un cambio hecho
+  // desde la gestión interna sin esperar al re-fetch del listado. El modal se
+  // monta con `key={person.id}` en cada uso, así que este `useState` siempre
+  // arranca con el estado correcto de la persona seleccionada.
+  const [estado, setEstado] = useState<MissingPersonStatus>(person.estado);
+
+  const m = STATUS_META[estado];
+  const esFallecido = estado === "Confirmado Fallecido";
   const images = person.missing_person_images ?? [];
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+
+  // ── Gestión interna (cambio de estado) ──────────────────────────────────
+  const toast = useToast();
+  const [busy, setBusy] = useState<MissingPersonStatus | null>(null);
+  const [motivoOpen, setMotivoOpen] = useState(false);
+  const [motivo, setMotivo] = useState("");
+  // Nota opcional que el público puede añadir al marcar como encontrada.
+  const [nota, setNota] = useState("");
+
+  async function changeEstado(nuevo: MissingPersonStatus) {
+    setBusy(nuevo);
+    try {
+      const res = await fetch(`/api/missing-persons/${person.id}/sighting`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          estado: nuevo,
+          ...(nota.trim() ? { notas: nota.trim() } : {}),
+          ...(nuevo === "Confirmado Fallecido" && motivo.trim()
+            ? { motivo_fallecimiento: motivo.trim() }
+            : {}),
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok || json.error) throw new Error(json.error || "No se pudo actualizar el estado");
+      setEstado(nuevo);
+      setMotivoOpen(false);
+      setMotivo("");
+      setNota("");
+      toast.success(
+        nuevo === "Confirmado Fallecido"
+          ? "Persona marcada como fallecida"
+          : nuevo === "Encontrado"
+            ? "Persona marcada como encontrada"
+            : "Reabierta como desaparecida",
+      );
+      onChanged?.();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Error inesperado");
+    } finally {
+      setBusy(null);
+    }
+  }
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -114,9 +196,34 @@ export function PersonModal({
               {person.nombre} {person.apellido}
             </h2>
 
-            {person.ultimo_lugar_visto && (
-              <p className="mt-1 text-sm text-gray-600 leading-snug">
-                Visto por última vez en {person.ultimo_lugar_visto}
+            {esFallecido
+              ? person.motivo_fallecimiento && (
+                  <p className="mt-1 text-sm text-gray-600 leading-snug">
+                    Motivo de fallecimiento: {person.motivo_fallecimiento}
+                  </p>
+                )
+              : person.ultimo_lugar_visto && (
+                  <p className="mt-1 text-sm text-gray-600 leading-snug">
+                    {estado === "Encontrado" ? (() => {
+                      const { icon, text } = formatFoundLocation(person.ultimo_lugar_visto);
+                      return (
+                        <>
+                          {icon === "✅" || icon === "🏠" ? (
+                            <span className="font-medium">{icon} {text}</span>
+                          ) : (
+                            <>Se encuentra en <span className="font-semibold">{icon} {text}</span></>
+                          )}
+                        </>
+                      );
+                    })() : (
+                      <>Visto por última vez en {person.ultimo_lugar_visto}</>
+                    )}
+                  </p>
+                )}
+
+            {esFallecido && person.fallecimiento_confirmado && (
+              <p className="mt-1.5 text-xs font-medium text-crisis">
+                Estaba reportada como desaparecida; su fallecimiento fue confirmado.
               </p>
             )}
           </div>
@@ -127,7 +234,16 @@ export function PersonModal({
               <Field label="Cédula" value={person.cedula} />
               <Field label="Edad" value={person.edad_aproximada ? `${person.edad_aproximada} años` : null} />
               <Field label="Género" value={person.genero} />
-              <Field label="Último lugar" value={person.ultimo_lugar_visto} />
+              {esFallecido ? (
+                <Field label="Motivo de fallecimiento" value={person.motivo_fallecimiento} />
+              ) : (() => {
+                  if (estado === "Encontrado" && person.ultimo_lugar_visto) {
+                    const { icon, text } = formatFoundLocation(person.ultimo_lugar_visto);
+                    return <Field label="Ubicación actual" value={`${icon} ${text}`.trim()} />;
+                  }
+                  return <Field label="Último lugar" value={person.ultimo_lugar_visto} />;
+                })()
+              }
             </dl>
             {person.informacion_adicional && (
               <p className="mt-3 pt-3 text-sm text-gray-700 leading-relaxed border-t border-border">
@@ -170,6 +286,107 @@ export function PersonModal({
               )}
             </div>
           </div>
+
+          {publicFound && estado !== "Encontrado" && estado !== "Confirmado Fallecido" && (
+            <div className="rounded-xl border border-primary/25 bg-primary-light/30 p-3.5 sm:p-4">
+              <h3 className="font-display text-sm font-bold text-gray-800">¿Ya fue encontrada?</h3>
+              <p className="mt-0.5 text-xs text-gray-500">
+                Si esta persona ya apareció o fue localizada, ayúdanos a actualizar el
+                registro. Puedes añadir una nota si lo deseas.
+              </p>
+              <textarea
+                value={nota}
+                onChange={(e) => setNota(e.target.value)}
+                rows={2}
+                placeholder="Nota (opcional): dónde o cómo fue encontrada…"
+                className="mt-3 w-full rounded-lg border border-border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-ring"
+              />
+              <button
+                type="button"
+                onClick={() => changeEstado("Encontrado")}
+                disabled={busy !== null}
+                className="mt-3 inline-flex items-center justify-center rounded-lg bg-primary hover:bg-primary-dark text-white font-semibold px-4 py-2.5 text-sm transition-colors disabled:opacity-60 w-full sm:w-auto min-h-[44px] sm:min-h-0"
+              >
+                {busy === "Encontrado" ? "Guardando…" : "Marcar como encontrada"}
+              </button>
+            </div>
+          )}
+
+          {publicFound && estado === "Encontrado" && (
+            <div className="rounded-xl border border-triage-green/30 bg-triage-green/5 p-3.5 sm:p-4 flex items-start gap-2.5">
+              <span className="mt-0.5 w-5 h-5 rounded-full bg-triage-green/15 text-triage-green flex items-center justify-center shrink-0">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} className="w-3 h-3">
+                  <path d="M20 6 9 17l-5-5" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </span>
+              <p className="text-sm text-gray-600 leading-snug">
+                Esta persona ya fue marcada como <strong className="text-gray-800">encontrada</strong>. ¡Gracias por mantener el registro al día!
+              </p>
+            </div>
+          )}
+
+          {manage && (
+            <div className="rounded-xl border border-amber-200 bg-amber-50/60 p-3.5 sm:p-4">
+              <h3 className="font-display text-sm font-bold text-gray-800">Gestión interna</h3>
+              <p className="mt-0.5 text-xs text-gray-500">
+                Actualiza el status de esta persona.
+              </p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {estado !== "Encontrado" && estado !== "Confirmado Fallecido" && (
+                  <button
+                    type="button"
+                    onClick={() => changeEstado("Encontrado")}
+                    disabled={busy !== null}
+                    className="inline-flex items-center rounded-lg bg-primary hover:bg-primary-dark text-white font-semibold px-3.5 py-2 text-sm transition-colors disabled:opacity-60"
+                  >
+                    {busy === "Encontrado" ? "Guardando…" : "Marcar como encontrada"}
+                  </button>
+                )}
+                {estado !== "Confirmado Fallecido" && (
+                  <button
+                    type="button"
+                    onClick={() => setMotivoOpen((v) => !v)}
+                    disabled={busy !== null}
+                    className="inline-flex items-center rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-100 font-semibold px-3.5 py-2 text-sm transition-colors disabled:opacity-60"
+                  >
+                    Confirmar fallecida
+                  </button>
+                )}
+                {(estado === "Encontrado" || estado === "Confirmado Fallecido") && (
+                  <button
+                    type="button"
+                    onClick={() => changeEstado("Desaparecido")}
+                    disabled={busy !== null}
+                    className="inline-flex items-center rounded-lg border border-crisis/30 text-crisis hover:bg-crisis-light font-semibold px-3.5 py-2 text-sm transition-colors disabled:opacity-60"
+                  >
+                    {busy === "Desaparecido" ? "Guardando…" : "Reabrir como desaparecida"}
+                  </button>
+                )}
+              </div>
+
+              {motivoOpen && estado !== "Confirmado Fallecido" && (
+                <div className="mt-3 space-y-2 rounded-lg border border-amber-200 bg-white/70 p-3">
+                  <label className="block text-xs font-semibold text-gray-600">
+                    Motivo de fallecimiento (opcional)
+                  </label>
+                  <input
+                    value={motivo}
+                    onChange={(e) => setMotivo(e.target.value)}
+                    placeholder="Ej: Causas naturales, accidente…"
+                    className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-ring"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => changeEstado("Confirmado Fallecido")}
+                    disabled={busy !== null}
+                    className="rounded-lg bg-gray-800 hover:bg-gray-900 text-white font-semibold px-3.5 py-2 text-sm transition-colors disabled:opacity-60"
+                  >
+                    {busy === "Confirmado Fallecido" ? "Confirmando…" : "Confirmar fallecimiento"}
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
 

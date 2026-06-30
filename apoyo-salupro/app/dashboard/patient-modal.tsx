@@ -12,6 +12,7 @@ import {
 import type { FoundMatchResult } from "@/lib/missing-person-match";
 import {
   DESTINOS,
+  destinoToCareState,
   formatDestino,
   isReferidoHospital,
   parseDestino,
@@ -287,6 +288,7 @@ export function PatientModal({
 
       const infoBody = {
         triage_category: form.triage_category,
+        estado_destino: destinoToCareState(form.destino),
         motivo_principal_consulta: form.motivo_principal_consulta.trim() || null,
         condiciones_preexistentes: form.condiciones_preexistentes.trim() || null,
         alergias: form.alergias.trim() || null,

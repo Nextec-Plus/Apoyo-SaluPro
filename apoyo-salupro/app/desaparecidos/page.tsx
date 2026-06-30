@@ -79,16 +79,17 @@ export default function DesaparecidosPage() {
 
   useEffect(() => {
     let active = true;
-    fetch("/api/missing-persons/stats")
-      .then((r) => r.json())
-      .then((json) => {
-        if (active && !json.error) setStats(json);
-      })
-      .catch(() => {})
-      .finally(() => active && setStatsLoading(false));
-    return () => {
-      active = false;
-    };
+    const load = () =>
+      fetch("/api/missing-persons/stats")
+        .then((r) => r.json())
+        .then((json) => { if (active && !json.error) setStats(json) })
+        .catch(() => {})
+        .finally(() => active && setStatsLoading(false));
+    load();
+    const id = setInterval(() => { if (document.visibilityState === "visible") load() }, 90_000);
+    const onVis = () => { if (document.visibilityState === "visible") load() };
+    document.addEventListener("visibilitychange", onVis);
+    return () => { active = false; clearInterval(id); document.removeEventListener("visibilitychange", onVis) };
   }, []);
 
   return (
@@ -135,7 +136,7 @@ export default function DesaparecidosPage() {
       </header>
 
       <main className="flex-1">
-        <SearchProvider config={missingPersonsConfig} initialFilters={{ estado: "Desaparecido" }}>
+        <SearchProvider config={missingPersonsConfig} initialFilters={{ estado: "Desaparecido" }} autoRefreshMs={90_000}>
           {/* Hero + buscador */}
           <section className="border-b border-border bg-gradient-to-b from-crisis/8 via-card to-card">
             <div className="mx-auto max-w-4xl px-4 pt-12 pb-10 sm:pt-16 sm:pb-14 text-center">
@@ -170,7 +171,7 @@ export default function DesaparecidosPage() {
 
           {/* Grid + filtros */}
           <section className="bg-card">
-            <div className="mx-auto max-w-7xl px-4 py-12 sm:py-16">
+            <div className="mx-auto max-w-[1600px] px-2 sm:px-3 py-10 sm:py-14">
               <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
                 <ResultCount
                   loadingLabel="Cargando…"
@@ -189,8 +190,9 @@ export default function DesaparecidosPage() {
 
               <div className="mt-4">
                 <ResultsGrid
-                  columns="sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
-                  skeleton={<MissingPersonCardSkeleton imageHeight="h-[240px]" />}
+                  columns="sm:grid-cols-2 lg:grid-cols-4"
+                  gap="gap-2 sm:gap-3"
+                  skeleton={<MissingPersonCardSkeleton />}
                   skeletonCount={8}
                   renderItem={(p: MissingPersonSearchItem) => (
                     <MissingPersonCard
@@ -198,7 +200,6 @@ export default function DesaparecidosPage() {
                       p={p}
                       onOpen={setSelected}
                       accent="crisis"
-                      imageHeight="h-[260px]"
                     />
                   )}
                 />
@@ -231,8 +232,10 @@ export default function DesaparecidosPage() {
 
       {selected && (
         <PersonModal
+          key={selected.id}
           person={selected}
           onClose={() => setSelected(null)}
+          publicFound
         />
       )}
     </div>

@@ -8,7 +8,6 @@ import {
   useMemo,
   useRef,
   useState,
-  useDeferredValue,
   type ReactNode,
 } from "react"
 import type {
@@ -51,19 +50,37 @@ export function SearchProvider<
   config,
   initialSearch = "",
   initialFilters,
+  autoRefreshMs,
   children,
 }: {
   config: SearchConfig<TItem, TFilters>
   initialSearch?: string
   /** Sobrescribe config.initialFilters para este contexto concreto. */
   initialFilters?: TFilters
+  /**
+   * Si se indica, re-fetcha automáticamente cada N ms cuando la pestaña es
+   * visible. También re-fetcha al volver a la pestaña (visibilitychange).
+   * Recomendado: 90_000 (90 s) para no saturar el free tier de Supabase.
+   */
+  autoRefreshMs?: number
   children: ReactNode
 }) {
   const mode = config.paginationMode ?? "infinite"
+  const debounceMs = config.searchDebounceMs ?? 250
 
   const [rawSearch, setRawSearch] = useState(initialSearch)
-  // useDeferredValue: el input sigue siendo responsivo aunque el fetch sea lento.
-  const search = useDeferredValue(rawSearch)
+  // `rawSearch` controla el input (responsivo); `search` es el valor debounced
+  // que realmente dispara el fetch → 1 petición por pausa, no por pulsación.
+  // Antes se usaba useDeferredValue, que NO es un debounce: difiere el render
+  // pero igual lanzaba un fetch en cada tecla (caro con miles de usuarios).
+  const [search, setSearch] = useState(initialSearch)
+
+  useEffect(() => {
+    if (search === rawSearch) return
+    const id = setTimeout(() => setSearch(rawSearch), debounceMs)
+    return () => clearTimeout(id)
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `search` sólo se lee para cortar el timer redundante
+  }, [rawSearch, debounceMs])
 
   const [items, setItems] = useState<TItem[]>([])
   const [nextCursor, setNextCursor] = useState<string | null>(null)
@@ -76,6 +93,14 @@ export function SearchProvider<
   const [page, setPage] = useState(1)
   const [total, setTotal] = useState(0)
   const [totalPages, setTotalPages] = useState(1)
+
+  // Refs para leer search/filters/page dentro del interval sin reiniciarlo.
+  const searchRef = useRef(search)
+  const filtersRef = useRef(filters)
+  const pageRef = useRef(page)
+  useEffect(() => { searchRef.current = search }, [search])
+  useEffect(() => { filtersRef.current = filters }, [filters])
+  useEffect(() => { pageRef.current = page }, [page])
 
   // AbortController en vuelo para cancelar fetches obsoletos → sin parpadeos.
   const inflightRef = useRef<AbortController | null>(null)
@@ -145,6 +170,23 @@ export function SearchProvider<
 
   // Limpieza al desmontar.
   useEffect(() => () => inflightRef.current?.abort(), [])
+
+  // Auto-refresh periódico — solo cuando la pestaña es visible.
+  useEffect(() => {
+    if (!autoRefreshMs) return
+    let id: ReturnType<typeof setInterval> | null = null
+    const refresh = () => {
+      if (document.visibilityState !== "visible") return
+      void runFirstPage(searchRef.current, filtersRef.current, pageRef.current)
+    }
+    id = setInterval(refresh, autoRefreshMs)
+    const onVis = () => { if (document.visibilityState === "visible") refresh() }
+    document.addEventListener("visibilitychange", onVis)
+    return () => {
+      if (id) clearInterval(id)
+      document.removeEventListener("visibilitychange", onVis)
+    }
+  }, [autoRefreshMs, runFirstPage])
 
   const loadMore = useCallback(async () => {
     if (loadingMore || loadingInitial || !hasMore || !nextCursor) return

@@ -1,3 +1,4 @@
+import { DESTINOS } from "@/lib/catastrophe-destinos"
 import type { SearchConfig } from "@/lib/search/types"
 import {
   type MissingPersonSearchItem,
@@ -30,6 +31,7 @@ export type PatientsFilters = {
   cedula: string // texto libre (ilike)
   edad_min: string // texto numérico
   edad_max: string // texto numérico
+  destino: string // "todos" | DestinoOption
 }
 
 export const patientsFilters: PatientsFilters = {
@@ -38,6 +40,7 @@ export const patientsFilters: PatientsFilters = {
   cedula: "",
   edad_min: "",
   edad_max: "",
+  destino: "todos",
 }
 
 export const missingPersonsFilterDefs = [
@@ -86,7 +89,7 @@ export const patientsFilterDefs = [
     label: "Cédula",
     type: "text" as const,
     allValue: "",
-    placeholder: "V-00000000",
+    placeholder: "Número de cédula",
   },
   {
     key: "edad_min" as const,
@@ -101,6 +104,16 @@ export const patientsFilterDefs = [
     type: "text" as const,
     allValue: "",
     placeholder: "120",
+  },
+  {
+    key: "destino" as const,
+    label: "Destino del paciente",
+    type: "select" as const,
+    allValue: "todos",
+    options: [
+      { value: "todos", label: "Todos los destinos" },
+      ...DESTINOS.map((d) => ({ value: d, label: d })),
+    ],
   },
 ] as const
 
@@ -148,7 +161,7 @@ export const missingPersonsPagedConfig: SearchConfig<
 > = {
   entity: "missing_persons",
   endpoint: "/api/missing-persons",
-  pageSize: 9,
+  pageSize: 12,
   view: "grid",
   paginationMode: "pages",
   initialFilters: { estado: "todos" },
@@ -192,7 +205,14 @@ export const patientsConfig: SearchConfig<
   endpoint: "/api/catastrophe/victims",
   pageSize: 25,
   view: "list",
-  initialFilters: { triage_level: "todos", genero: "todos", cedula: "", edad_min: "", edad_max: "" },
+  initialFilters: {
+    triage_level: "todos",
+    genero: "todos",
+    cedula: "",
+    edad_min: "",
+    edad_max: "",
+    destino: "todos",
+  },
   filters: [...patientsFilterDefs],
   buildQuery: ({ search, filters, cursor, pageSize }) => {
     const orgId = getClientOrganizationId()
@@ -208,6 +228,9 @@ export const patientsConfig: SearchConfig<
     if (filters.cedula.trim()) p.set("cedula", filters.cedula.trim())
     if (filters.edad_min.trim()) p.set("edad_min", filters.edad_min.trim())
     if (filters.edad_max.trim()) p.set("edad_max", filters.edad_max.trim())
+    if (filters.destino && filters.destino !== "todos") {
+      p.set("destino", filters.destino)
+    }
     if (cursor) p.set("cursor", cursor)
     return `/api/catastrophe/victims?${p.toString()}`
   },

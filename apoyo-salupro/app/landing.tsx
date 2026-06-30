@@ -4,8 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import type { MissingPersonSearchItem } from "@/lib/search/types";
-import { missingPersonsPagedConfig } from "@/lib/search/configs";
-import { SearchProvider } from "@/components/search/SearchProvider";
+import { missingPersonsPagedConfig, type MissingPersonsFilters } from "@/lib/search/configs";
+import { SearchProvider, useSearch } from "@/components/search/SearchProvider";
 import {
   ActiveChips,
   FilterPanel,
@@ -93,20 +93,23 @@ const I = {
 
 export default function Landing() {
   const [menu, setMenu] = useState(false);
-  const [stats, setStats] = useState({ total: 0, busquedas: 0, encontradas: 0 });
+  const [stats, setStats] = useState({ total: 0, busquedas: 0, encontradas: 0, fallecidas: 0 });
   const [statsLoading, setStatsLoading] = useState(true);
 
   useEffect(() => {
     let active = true;
-    fetch("/api/missing-persons/stats")
-      .then((r) => r.json())
-      .then((json) => {
-        if (!active) return;
-        if (!json.error) setStats(json);
-      })
-      .catch(() => {})
-      .finally(() => active && setStatsLoading(false));
-    return () => { active = false };
+    const load = () =>
+      fetch("/api/missing-persons/stats")
+        .then((r) => r.json())
+        .then((json) => { if (active && !json.error) setStats(json) })
+        .catch(() => {})
+        .finally(() => active && setStatsLoading(false));
+    load();
+    // Re-fetch stats cada 90 s cuando la pestaña está activa.
+    const id = setInterval(() => { if (document.visibilityState === "visible") load() }, 90_000);
+    const onVis = () => { if (document.visibilityState === "visible") load() };
+    document.addEventListener("visibilitychange", onVis);
+    return () => { active = false; clearInterval(id); document.removeEventListener("visibilitychange", onVis) };
   }, []);
 
   return (
@@ -115,7 +118,7 @@ export default function Landing() {
       <SiteHeader menu={menu} setMenu={setMenu} />
 
       <main className="flex-1">
-        <SearchProvider config={missingPersonsPagedConfig}>
+        <SearchProvider config={missingPersonsPagedConfig} autoRefreshMs={90_000}>
           <HeroSearchSection />
 
           <CountersSection stats={stats} loading={statsLoading} />
@@ -276,25 +279,44 @@ function CountersSection({
   stats,
   loading,
 }: {
-  stats: { total: number; busquedas: number; encontradas: number };
+  stats: { total: number; busquedas: number; encontradas: number; fallecidas: number };
   loading: boolean;
 }) {
+  const { setFilter } = useSearch<MissingPersonSearchItem, MissingPersonsFilters>();
+
+  // Al pulsar un contador: filtra la grilla por ese estado y baja al listado.
+  const go = (estado: string) => {
+    setFilter("estado", estado);
+    if (typeof document !== "undefined") {
+      document.getElementById("casos")?.scrollIntoView({ behavior: "smooth" });
+    }
+  };
+
+  const items: { v: number; label: string; color: string; estado: string }[] = [
+    { v: stats.total, label: "Personas registradas", color: "text-gray-900", estado: "todos" },
+    { v: stats.busquedas, label: "Aún buscadas", color: "text-crisis", estado: "Desaparecido" },
+    { v: stats.encontradas, label: "Encontradas", color: "text-triage-green", estado: "Encontrado" },
+    { v: stats.fallecidas, label: "Fallecidas", color: "text-gray-600", estado: "Confirmado Fallecido" },
+  ];
+
   return (
     <section className="border-b border-border bg-card">
-      <div className="mx-auto max-w-3xl px-4 py-10 grid grid-cols-3 gap-2 sm:gap-4 text-center">
-        {[
-          { v: stats.total, label: "Personas registradas", color: "text-gray-900" },
-          { v: stats.busquedas, label: "Aún buscadas", color: "text-crisis" },
-          { v: stats.encontradas, label: "Encontradas", color: "text-triage-green" },
-        ].map((s) => (
-          <div key={s.label}>
+      <div className="mx-auto max-w-4xl px-4 py-10 grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 text-center">
+        {items.map((s) => (
+          <button
+            key={s.label}
+            type="button"
+            onClick={() => go(s.estado)}
+            className="group rounded-xl px-2 py-2 transition-colors hover:bg-muted/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-ring"
+            aria-label={`Ver ${s.label.toLowerCase()}`}
+          >
             <div className={`font-display text-3xl sm:text-5xl font-extrabold ${s.color}`}>
               {loading ? "—" : <Counter to={s.v} />}
             </div>
-            <div className="mt-1.5 text-[11px] sm:text-xs font-semibold uppercase tracking-widest text-gray-500">
+            <div className="mt-1.5 text-[11px] sm:text-xs font-semibold uppercase tracking-widest text-gray-500 group-hover:text-gray-700">
               {s.label}
             </div>
-          </div>
+          </button>
         ))}
       </div>
     </section>
@@ -309,7 +331,7 @@ function CasosSection() {
 
   return (
     <section ref={casosRef} id="casos" className="bg-card border-b border-border scroll-mt-20">
-      <div className="mx-auto max-w-7xl px-4 py-16 sm:py-20">
+      <div className="mx-auto max-w-[1600px] px-2 sm:px-3 py-12 sm:py-16">
         <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mb-6">
           <div>
             <p className="text-xs font-bold uppercase tracking-widest text-primary mb-3">Registro central</p>
@@ -328,9 +350,10 @@ function CasosSection() {
 
         <div className="mt-4">
           <ResultsGrid
-            columns="sm:grid-cols-2 lg:grid-cols-3"
+            columns="sm:grid-cols-2 lg:grid-cols-4"
+            gap="gap-2 sm:gap-3"
             skeleton={<MissingPersonCardSkeleton />}
-            skeletonCount={6}
+            skeletonCount={8}
             renderItem={(p: MissingPersonSearchItem) => (
               <MissingPersonCard
                 key={p.id}
@@ -357,8 +380,10 @@ function CasosSection() {
 
       {selected && (
         <PersonModal
+          key={selected.id}
           person={selected as PersonModalPerson}
           onClose={() => setSelected(null)}
+          publicFound
         />
       )}
     </section>
@@ -405,12 +430,14 @@ function HowItWorksSection() {
   );
 }
 
-/* ── Alianza La Vaca ─────────────────────────────────────────────────────── */
+/* ── Alianzas ────────────────────────────────────────────────────────────── */
 
 function AlianzaSection() {
   return (
     <section id="alianza" className="bg-muted/50 border-b border-border scroll-mt-20">
-      <div className="mx-auto max-w-7xl px-4 py-16 sm:py-20">
+      <div className="mx-auto max-w-7xl px-4 py-16 sm:py-20 space-y-6">
+
+        {/* La Vaca — crowdfunding */}
         <div className="rounded-3xl border border-border bg-card overflow-hidden grid lg:grid-cols-[1.3fr_1fr]">
           <div className="p-8 sm:p-12">
             <span className="inline-flex items-center gap-2 rounded-full bg-primary-light text-primary-dark text-xs font-semibold px-3 py-1.5 mb-6">
@@ -478,6 +505,45 @@ function AlianzaSection() {
             </div>
           </div>
         </div>
+
+        {/* Venezuela te busca — plataforma ciudadana */}
+        <div className="rounded-3xl border border-border bg-card overflow-hidden grid md:grid-cols-[auto_1fr] items-center gap-0">
+          {/* Lateral de color */}
+          <div className="hidden md:flex flex-col items-center justify-center gap-3 bg-[#FDECEA] px-10 py-12 self-stretch rounded-l-3xl min-w-[200px]">
+            <span className="text-5xl select-none" aria-hidden>🇻🇪</span>
+            <span className="font-display text-sm font-bold text-[#C0392B] text-center leading-tight">
+              Venezuela<br />te busca
+            </span>
+          </div>
+
+          {/* Contenido */}
+          <div className="p-8 sm:p-10">
+            <span className="inline-flex items-center gap-2 rounded-full bg-[#FDECEA] text-[#C0392B] text-xs font-semibold px-3 py-1.5 mb-5">
+              <Icon path={I.heart} className="w-3.5 h-3.5" />
+              Alianza · Venezuela te busca
+            </span>
+            <h3 className="font-display text-2xl sm:text-3xl font-bold tracking-tight leading-tight">
+              Registro ciudadano de personas
+              <span className="text-[#C0392B]"> desaparecidas.</span>
+            </h3>
+            <p className="mt-4 text-gray-600 leading-relaxed max-w-2xl text-sm sm:text-base">
+              Iniciativa voluntaria y sin fines de lucro que complementa nuestra plataforma. Más de{" "}
+              <strong className="text-gray-900">25.000 personas</strong> registradas por ciudadanos
+              para ayudar a localizar a familiares desaparecidos tras el terremoto de Venezuela 2026.
+              Los datos son usados exclusivamente para la localización de personas.
+            </p>
+            <a
+              href="https://venezuela-te-busca-app.hellogafaro.workers.dev"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-6 inline-flex items-center gap-2 rounded-xl border border-[#C0392B]/30 text-[#C0392B] hover:bg-[#FDECEA] font-semibold px-5 py-2.5 text-sm transition-colors"
+            >
+              Visitar Venezuela te busca
+              <Icon path={I.arrow} className="w-4 h-4" />
+            </a>
+          </div>
+        </div>
+
       </div>
     </section>
   );
@@ -536,7 +602,7 @@ function SiteFooter() {
             <ul className="space-y-2.5 text-sm">
               <li><a href="#buscar" className="hover:text-white transition-colors">Buscar personas</a></li>
               <li><Link href="/reportar" className="hover:text-white transition-colors">Reportar desaparición</Link></li>
-              <li><a href="#alianza" className="hover:text-white transition-colors">Alianza La Vaca</a></li>
+              <li><a href="#alianza" className="hover:text-white transition-colors">Alianzas</a></li>
             </ul>
           </div>
 
