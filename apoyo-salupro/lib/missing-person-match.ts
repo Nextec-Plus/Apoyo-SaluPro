@@ -92,6 +92,7 @@ export async function syncMissingPersonMatches(
 
     const created = !insertError
 
+    const TERMINAL = "Terminal de Pasajeros Catia La Mar"
     const locationUpdate: { ultimo_lugar_visto?: string } = {}
     if (victim.notas?.trim()) {
       if (isReferidoHospitalNotas(victim.notas)) {
@@ -102,7 +103,12 @@ export async function syncMissingPersonMatches(
       } else {
         const { destino } = parseDestino(victim.notas)
         if ((DESTINOS as readonly string[]).includes(destino)) {
-          locationUpdate.ultimo_lugar_visto = destino
+          const esObservacionOAlta =
+            destino === "En observación en módulo móvil" ||
+            destino === "Dado de alta (Ambulatorio)"
+          locationUpdate.ultimo_lugar_visto = esObservacionOAlta
+            ? `${destino} — ${TERMINAL}`
+            : destino
         }
       }
     }
