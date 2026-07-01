@@ -68,6 +68,7 @@ export function SolicitudForm({ sections }: Props) {
   const [selected, setSelected] = useState<SelectedSection[]>([]);
   const [gpsState, setGpsState] = useState<GpsState>("idle");
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const [accuracy, setAccuracy] = useState<number | null>(null);
   const [gpsAddress, setGpsAddress] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -79,8 +80,9 @@ export function SolicitudForm({ sections }: Props) {
     setGpsState("loading");
     navigator.geolocation.getCurrentPosition(
       async (pos) => {
-        const { latitude: lat, longitude: lng } = pos.coords;
+        const { latitude: lat, longitude: lng, accuracy: acc } = pos.coords;
         setCoords({ lat, lng });
+        setAccuracy(acc ?? null);
         setGpsState("success");
         try {
           const r = await fetch(
@@ -181,7 +183,7 @@ export function SolicitudForm({ sections }: Props) {
             </Link>
             <button
               type="button"
-              onClick={() => { setDone(false); setSelected([]); setCoords(null); setGpsState("idle"); setGpsAddress(""); }}
+              onClick={() => { setDone(false); setSelected([]); setCoords(null); setAccuracy(null); setGpsState("idle"); setGpsAddress(""); }}
               className="rounded-xl border border-border hover:bg-muted text-gray-600 font-semibold py-3 text-sm transition-colors"
             >
               Hacer otra solicitud
@@ -388,16 +390,25 @@ export function SolicitudForm({ sections }: Props) {
           {/* ── 4. Ubicación ────────────────────────────────────── */}
           <fieldset className="rounded-2xl border border-border bg-white p-6 sm:p-7">
             <legend className="px-2 font-display text-lg font-bold text-gray-900">¿Dónde estás?</legend>
-            <p className="text-xs text-gray-500 mb-5 mt-1">
+            <p className="text-xs text-gray-500 mb-4 mt-1">
               Tu ubicación nos ayuda a coordinar la entrega. Compártela automáticamente o descríbela.
             </p>
+
+            {/* Llamado a usar ubicación exacta (recomendado, no obligatorio) */}
+            <div className="mb-4 flex items-start gap-3 rounded-xl border border-primary/20 bg-primary-light/40 px-4 py-3">
+              <span className="text-lg leading-none mt-0.5">📍</span>
+              <p className="text-xs text-primary-dark leading-relaxed">
+                <strong>Lo ideal es compartir tu ubicación exacta.</strong> No es obligatorio, pero ayuda a que la ayuda
+                llegue más rápido y al lugar correcto. Tu punto se suma al mapa de calor que prioriza las zonas más afectadas.
+              </p>
+            </div>
 
             <div className="mb-4">
               {gpsState === "idle" && (
                 <button type="button" onClick={handleGetLocation}
-                  className="flex items-center gap-2 rounded-xl border-2 border-dashed border-primary/40 bg-primary-light/30 hover:bg-primary-light px-5 py-3.5 text-sm font-semibold text-primary-dark transition-colors w-full sm:w-auto">
+                  className="flex items-center justify-center gap-2 rounded-xl bg-primary hover:bg-primary-dark px-5 py-3.5 text-sm font-bold text-white transition-colors w-full shadow-sm shadow-primary/20">
                   <Icon path={I.gps} className="w-5 h-5" />
-                  Compartir mi ubicación
+                  Usar mi ubicación exacta (recomendado)
                 </button>
               )}
               {gpsState === "loading" && (
@@ -414,7 +425,13 @@ export function SolicitudForm({ sections }: Props) {
                   </div>
                   {gpsAddress && <p className="text-xs text-gray-600 mb-1 leading-relaxed">{gpsAddress}</p>}
                   <p className="text-[11px] font-mono text-gray-400">{coords.lat.toFixed(5)}, {coords.lng.toFixed(5)}</p>
-                  <button type="button" onClick={() => { setGpsState("idle"); setCoords(null); setGpsAddress(""); }}
+                  {accuracy !== null && (
+                    <p className={`text-[11px] font-semibold mt-1 ${accuracy <= 30 ? "text-primary" : accuracy <= 100 ? "text-amber-600" : "text-gray-400"}`}>
+                      Precisión: ±{Math.round(accuracy)} m
+                      {accuracy <= 30 ? " · excelente" : accuracy <= 100 ? " · buena" : " · aproximada (activa el GPS para mejorarla)"}
+                    </p>
+                  )}
+                  <button type="button" onClick={() => { setGpsState("idle"); setCoords(null); setAccuracy(null); setGpsAddress(""); }}
                     className="mt-2 text-xs text-gray-400 hover:text-crisis underline underline-offset-2">
                     Eliminar ubicación
                   </button>
