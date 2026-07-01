@@ -17,6 +17,7 @@ type ExportType =
   | "fallecidos";
 type ExportFormat = "csv" | "pdf";
 type ExportKey = `${ExportType}:${ExportFormat}`;
+type IngresosHoyExportKey = `ingresos-hoy:${ExportFormat}`;
 
 function StatCard({
   value,
@@ -151,7 +152,7 @@ export function TabReportes() {
   const orgId = getClientOrganizationId();
   const [summary, setSummary] = useState<ReportesSummary | null>(null);
   const [loading, setLoading] = useState(true);
-  const [exporting, setExporting] = useState<ExportKey | null>(null);
+  const [exporting, setExporting] = useState<ExportKey | IngresosHoyExportKey | null>(null);
 
   const loadSummary = useCallback(async () => {
     setLoading(true);
@@ -169,6 +170,36 @@ export function TabReportes() {
   useEffect(() => {
     loadSummary();
   }, [loadSummary]);
+
+  const downloadIngresosHoy = async (format: ExportFormat) => {
+    const key: IngresosHoyExportKey = `ingresos-hoy:${format}`;
+    setExporting(key);
+    try {
+      const res = await fetch(
+        `/api/reportes/ingresos-hoy/export?format=${format}&organization_id=${orgId}`,
+      );
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error ?? "Error al exportar");
+      }
+      const blob = await res.blob();
+      const disposition = res.headers.get("Content-Disposition") ?? "";
+      const match = disposition.match(/filename="([^"]+)"/);
+      const filename = match?.[1] ?? `ingresos-hoy.${format}`;
+
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success("Descarga iniciada");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Error al exportar");
+    } finally {
+      setExporting(null);
+    }
+  };
 
   const download = async (type: ExportType, format: ExportFormat) => {
     const key: ExportKey = `${type}:${format}`;
@@ -405,6 +436,15 @@ export function TabReportes() {
           CSV para Excel · PDF para impresión y archivo oficial.
         </p>
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          <ExportCard
+            label="Ingresos del día de hoy"
+            description="Pacientes registrados hoy (hora Venezuela)"
+            onCsv={() => downloadIngresosHoy("csv")}
+            onPdf={() => downloadIngresosHoy("pdf")}
+            loadingCsv={exporting === "ingresos-hoy:csv"}
+            loadingPdf={exporting === "ingresos-hoy:pdf"}
+            accent="border-primary/20"
+          />
           <ExportCard
             label="Resumen general"
             description="Totales y contadores agregados"
