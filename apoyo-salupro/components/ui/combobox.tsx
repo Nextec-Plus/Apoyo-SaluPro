@@ -104,7 +104,7 @@ export function Combobox({
           "w-full text-sm text-left bg-white border border-border rounded-lg px-3 py-2.5",
           "transition-colors",
           disabled
-            ? "bg-gray-100/70 border-dashed border-gray-300 text-gray-400 cursor-not-allowed"
+            ? "bg-gray-300 border-gray-300 text-gray-500 cursor-not-allowed"
             : value
               ? "text-gray-900"
               : "text-gray-400",

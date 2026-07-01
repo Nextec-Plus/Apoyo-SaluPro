@@ -516,45 +516,60 @@ function MovimientoForm({
       )}
 
       {showQuickCreate && subcategoryId && (
-        <div className="flex items-end gap-3 bg-primary/5 border border-primary/20 rounded-lg p-3 animate-in fade-in">
-          <div className="flex-1">
-            <label className="block text-[11px] font-semibold text-gray-700 mb-1">Nombre del artículo</label>
-            <input
-              id="quick-nombre"
-              value={quickNombre}
-              onChange={(e) => setQuickNombre(e.target.value)}
-              placeholder="Ej: Jarabe 120ml, Caja × 12..."
-              className={inputCls}
-              onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); quickCreate(); } }}
+        <div className="bg-primary/5 border border-primary/20 rounded-lg p-3 space-y-3 animate-in fade-in">
+          <div className="flex items-end gap-3">
+            <div className="flex-1">
+              <label className="block text-[11px] font-semibold text-gray-700 mb-1">Nombre del artículo</label>
+              <input
+                id="quick-nombre"
+                value={quickNombre}
+                onChange={(e) => setQuickNombre(e.target.value)}
+                placeholder="Ej: Jarabe 120ml, Caja × 12..."
+                className={inputCls}
+                onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); quickCreate(); } }}
+              />
+            </div>
+            <div className="w-28">
+              <label className="block text-[11px] font-semibold text-gray-700 mb-1">Cant. inicial</label>
+              <input
+                type="number"
+                min={1}
+                value={quickCantidad}
+                onChange={(e) => setQuickCantidad(e.target.value)}
+                placeholder="1"
+                className={inputCls}
+                onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); quickCreate(); } }}
+              />
+            </div>
+            <button
+              type="button"
+              onClick={quickCreate}
+              disabled={quickCreating}
+              className="bg-primary hover:bg-primary/90 text-white font-bold text-xs px-4 py-2.5 rounded-lg disabled:opacity-60 whitespace-nowrap"
+            >
+              {quickCreating ? "Creando…" : "Crear"}
+            </button>
+            <button
+              type="button"
+              onClick={() => { setShowQuickCreate(false); setQuickNombre(""); setQuickCantidad(""); }}
+              className="text-xs text-gray-400 hover:text-gray-600"
+            >
+              Cancelar
+            </button>
+          </div>
+          <div>
+            <label className="block text-[11px] font-semibold text-gray-700 mb-1">Ubicación (opcional)</label>
+            <Combobox
+              items={locationItems}
+              value={locationId}
+              onChange={setLocationId}
+              placeholder="Seleccione ubicación..."
+              emptyText="Sin ubicaciones"
+              createLabel="Crear nueva ubicación"
+              createPlaceholder="Nombre de la ubicación"
+              onCreate={onCreateLocation}
             />
           </div>
-          <div className="w-28">
-            <label className="block text-[11px] font-semibold text-gray-700 mb-1">Cant. inicial</label>
-            <input
-              type="number"
-              min={1}
-              value={quickCantidad}
-              onChange={(e) => setQuickCantidad(e.target.value)}
-              placeholder="1"
-              className={inputCls}
-              onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); quickCreate(); } }}
-            />
-          </div>
-          <button
-            type="button"
-            onClick={quickCreate}
-            disabled={quickCreating}
-            className="bg-primary hover:bg-primary/90 text-white font-bold text-xs px-4 py-2.5 rounded-lg disabled:opacity-60 whitespace-nowrap"
-          >
-            {quickCreating ? "Creando…" : "Crear"}
-          </button>
-          <button
-            type="button"
-            onClick={() => { setShowQuickCreate(false); setQuickNombre(""); setQuickCantidad(""); }}
-            className="text-xs text-gray-400 hover:text-gray-600"
-          >
-            Cancelar
-          </button>
         </div>
       )}
 

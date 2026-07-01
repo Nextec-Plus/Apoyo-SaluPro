@@ -6,7 +6,7 @@ const inputCls =
   "w-full text-sm bg-white border border-border rounded-lg px-3 py-2.5 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-ring focus:border-primary transition-colors";
 
 const inputDisabledCls =
-  "w-full text-sm bg-gray-100/70 border border-dashed border-gray-300 rounded-lg px-3 py-2.5 text-gray-400 cursor-not-allowed transition-colors";
+  "w-full text-sm bg-gray-300 border border-gray-300 rounded-lg px-3 py-2.5 text-gray-500 cursor-not-allowed transition-colors";
 
 const labelCls = "block text-xs font-semibold text-gray-700 mb-1";
 
