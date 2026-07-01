@@ -188,13 +188,6 @@ function SiteHeader({ menu, setMenu }: { menu: boolean; setMenu: (v: boolean | (
             Solicitar insumos
           </Link>
           <Link
-            href="/mapa"
-            className="hidden md:inline-flex items-center gap-1.5 rounded-lg border border-blue-200 text-blue-600 hover:bg-blue-50 px-4 py-2 text-sm font-semibold transition-colors"
-          >
-            <Icon path={I.mapa} className="w-4 h-4" />
-            Mapa
-          </Link>
-          <Link
             href="/reportar"
             className="hidden sm:inline-flex items-center gap-1.5 rounded-lg bg-crisis hover:bg-crisis-dark text-white px-4 py-2 text-sm font-semibold transition-colors"
           >
@@ -229,9 +222,6 @@ function SiteHeader({ menu, setMenu }: { menu: boolean; setMenu: (v: boolean | (
           </Link>
           <Link href="/solicitar-insumos" onClick={() => setMenu(false)} className="py-2 font-semibold text-primary">
             📋 Solicitar insumos
-          </Link>
-          <Link href="/mapa" onClick={() => setMenu(false)} className="py-2 font-semibold text-blue-600">
-            🗺️ Ver mapa
           </Link>
           <Link href="/reportar" onClick={() => setMenu(false)} className="py-2 font-semibold text-crisis">
             + Reportar persona
