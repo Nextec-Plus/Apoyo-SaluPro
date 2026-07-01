@@ -9,7 +9,7 @@ import { inputCls, inputDisabledCls, labelCls } from "./cascade-step";
 
 const textareaCls = inputCls + " resize-none";
 
-type SubView = "tablero" | "entrada" | "salida" | "kardex";
+type SubView = "tablero" | "entrada" | "salida" | "traslado" | "kardex";
 
 export function TabInventario() {
   const toast = useToast();
@@ -117,6 +117,7 @@ export function TabInventario() {
     { v: "tablero", label: "Tablero" },
     { v: "entrada", label: "Entrada" },
     { v: "salida", label: "Salida" },
+    { v: "traslado", label: "Traslado" },
     { v: "kardex", label: "Kardex" },
   ];
 
@@ -172,6 +173,15 @@ export function TabInventario() {
           onCreateSection={createSection}
           onCreateSubcategory={createSubcategory}
           onCreateLocation={createLocation}
+        />
+      )}
+      {subView === "traslado" && (
+        <TrasladoForm
+          items={items}
+          sections={sections}
+          locations={locations}
+          loading={loadingItems || loadingSections}
+          onCreated={loadItems}
         />
       )}
       {subView === "kardex" && (
@@ -701,6 +711,311 @@ function MovimientoForm({
           </span>
         )}
       </div>
+    </form>
+  );
+}
+
+/* ─────────────────────────────── Traslado ────────────────────────────────── */
+
+type TrasladoLinea = {
+  itemId: string;
+  presentacion: string;
+  cantidad: number;
+  stockOrigen: number;
+};
+
+function TrasladoForm({
+  items,
+  sections,
+  locations,
+  loading,
+  onCreated,
+}: {
+  items: ItemRow[];
+  sections: SectionWithSubcats[];
+  locations: InventoryLocation[];
+  loading: boolean;
+  onCreated: () => void;
+}) {
+  const toast = useToast();
+  const [locationOrigenId, setLocationOrigenId] = useState("");
+  const [locationDestinoId, setLocationDestinoId] = useState("");
+  const [sectionId, setSectionId] = useState("");
+  const [subcategoryId, setSubcategoryId] = useState("");
+  const [itemId, setItemId] = useState("");
+  const [cantidad, setCantidad] = useState("");
+  const [nota, setNota] = useState("");
+  const [lineas, setLineas] = useState<TrasladoLinea[]>([]);
+  const [submitting, setSubmitting] = useState(false);
+
+  const selectedSection = useMemo(
+    () => sections.find((s) => s.id === sectionId) ?? null,
+    [sections, sectionId],
+  );
+
+  const sectionItems = useMemo(
+    () => sections.map((s) => ({ id: s.id, label: `${s.code}. ${s.name}` })),
+    [sections],
+  );
+
+  const subcategoryItems = useMemo(
+    () => (selectedSection?.subcategories ?? []).map((sc) => ({ id: sc.id, label: sc.name })),
+    [selectedSection],
+  );
+
+  const stockEnOrigen = useCallback(
+    (it: ItemRow) => it.stock_locations.find((l) => l.location_id === locationOrigenId)?.stock ?? 0,
+    [locationOrigenId],
+  );
+
+  const filteredItems = useMemo(() => {
+    if (!subcategoryId || !locationOrigenId) return [] as ItemRow[];
+    return items.filter((it) => it.subcategory?.id === subcategoryId && stockEnOrigen(it) > 0);
+  }, [items, subcategoryId, locationOrigenId, stockEnOrigen]);
+
+  const origenItems = useMemo(
+    () => locations.map((l) => ({ id: l.id, label: l.name })),
+    [locations],
+  );
+
+  const destinoItems = useMemo(
+    () => locations.filter((l) => l.id !== locationOrigenId).map((l) => ({ id: l.id, label: l.name })),
+    [locations, locationOrigenId],
+  );
+
+  const selected = useMemo(() => items.find((it) => it.id === itemId) ?? null, [items, itemId]);
+  const stockDisponible = selected ? stockEnOrigen(selected) : 0;
+
+  const handleOrigenChange = (id: string) => {
+    if (lineas.length > 0 && !confirm("Cambiar la ubicación origen vaciará la lista de artículos agregados. ¿Continuar?")) return;
+    setLocationOrigenId(id);
+    if (locationDestinoId === id) setLocationDestinoId("");
+    setSectionId("");
+    setSubcategoryId("");
+    setItemId("");
+    setCantidad("");
+    setLineas([]);
+  };
+
+  const addLinea = () => {
+    if (!selected) return toast.error("Seleccione un artículo.");
+    const cant = Number(cantidad);
+    if (!Number.isFinite(cant) || cant <= 0) return toast.error("Cantidad inválida.");
+    if (cant > stockDisponible) return toast.error(`Stock insuficiente en origen: solo hay ${stockDisponible} disponibles.`);
+
+    setLineas((prev) => {
+      const existente = prev.find((l) => l.itemId === selected.id);
+      if (existente) {
+        const nuevaCant = existente.cantidad + cant;
+        if (nuevaCant > stockDisponible) {
+          toast.error(`Stock insuficiente en origen: solo hay ${stockDisponible} disponibles.`);
+          return prev;
+        }
+        return prev.map((l) => (l.itemId === selected.id ? { ...l, cantidad: nuevaCant } : l));
+      }
+      return [...prev, { itemId: selected.id, presentacion: selected.presentacion, cantidad: cant, stockOrigen: stockDisponible }];
+    });
+    setItemId("");
+    setCantidad("");
+  };
+
+  const removeLinea = (id: string) => setLineas((prev) => prev.filter((l) => l.itemId !== id));
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!locationOrigenId || !locationDestinoId) return toast.error("Seleccione ubicación origen y destino.");
+    if (lineas.length === 0) return toast.error("Agregue al menos un artículo a la lista.");
+
+    setSubmitting(true);
+    try {
+      const res = await fetch("/api/inventory/transfers", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          location_origen_id: locationOrigenId,
+          location_destino_id: locationDestinoId,
+          items: lineas.map((l) => ({ item_id: l.itemId, cantidad: l.cantidad })),
+          nota: nota.trim() || null,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok || json.error) throw new Error(json.error || "Error al registrar el traslado");
+
+      const origenNombre = locations.find((l) => l.id === locationOrigenId)?.name ?? "";
+      const destinoNombre = locations.find((l) => l.id === locationDestinoId)?.name ?? "";
+      toast.success(
+        `${lineas.length} producto${lineas.length === 1 ? "" : "s"} trasladado${lineas.length === 1 ? "" : "s"} de ${origenNombre} a ${destinoNombre}`,
+      );
+
+      setLineas([]);
+      setNota("");
+      setSectionId("");
+      setSubcategoryId("");
+      setItemId("");
+      setCantidad("");
+      onCreated();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Error inesperado");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-5 max-w-2xl">
+      <p className="text-xs text-gray-500 bg-muted border border-border rounded-lg px-3 py-2">
+        💡 Mueve artículos ya existentes de una ubicación a otra. Selecciona origen y destino, agrega los productos y confirma.
+      </p>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <label className={labelCls}>Ubicación origen</label>
+          <Combobox
+            items={origenItems}
+            value={locationOrigenId}
+            onChange={handleOrigenChange}
+            placeholder="Seleccione origen..."
+            disabled={loading}
+            emptyText="Sin ubicaciones"
+          />
+        </div>
+        <div>
+          <label className={labelCls}>Ubicación destino</label>
+          <Combobox
+            items={destinoItems}
+            value={locationDestinoId}
+            onChange={setLocationDestinoId}
+            placeholder="Seleccione destino..."
+            disabled={!locationOrigenId}
+            emptyText="Sin ubicaciones"
+          />
+        </div>
+      </div>
+
+      <div className="border border-border rounded-lg p-4 space-y-4 bg-muted/40">
+        <p className="text-[11px] font-bold uppercase tracking-widest text-gray-400">Agregar artículo</p>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div>
+            <label className={labelCls}>Categoría</label>
+            <Combobox
+              items={sectionItems}
+              value={sectionId}
+              onChange={(id) => { setSectionId(id); setSubcategoryId(""); setItemId(""); }}
+              placeholder="Seleccione..."
+              disabled={!locationOrigenId}
+            />
+          </div>
+          <div>
+            <label className={labelCls}>Subcategoría</label>
+            <Combobox
+              items={subcategoryItems}
+              value={subcategoryId}
+              onChange={(id) => { setSubcategoryId(id); setItemId(""); }}
+              placeholder="Seleccione..."
+              disabled={!sectionId}
+              emptyText="Selecciona primero la categoría"
+            />
+          </div>
+          <div>
+            <label className={labelCls}>Artículo</label>
+            <select
+              value={itemId}
+              onChange={(e) => { setItemId(e.target.value); setCantidad(""); }}
+              className={!subcategoryId ? inputDisabledCls : inputCls}
+              disabled={!subcategoryId}
+            >
+              <option value="">— Seleccione —</option>
+              {filteredItems.map((it) => (
+                <option key={it.id} value={it.id}>
+                  {it.presentacion} ({stockEnOrigen(it)} disp.)
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        {subcategoryId && locationOrigenId && filteredItems.length === 0 && (
+          <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+            Sin stock disponible en esta ubicación para esta subcategoría.
+          </p>
+        )}
+
+        <div className="flex items-end gap-3">
+          <div className="w-32">
+            <label className={labelCls}>
+              Cantidad {selected && <span className="font-normal text-gray-400">(máx: {stockDisponible})</span>}
+            </label>
+            <input
+              type="number"
+              min={1}
+              max={stockDisponible || undefined}
+              value={cantidad}
+              onChange={(e) => setCantidad(e.target.value)}
+              placeholder="0"
+              className={inputCls}
+              disabled={!itemId}
+            />
+          </div>
+          <button
+            type="button"
+            onClick={addLinea}
+            disabled={!itemId || !cantidad}
+            className="bg-primary hover:bg-primary/90 text-white font-bold text-xs px-4 py-2.5 rounded-lg disabled:opacity-60 whitespace-nowrap"
+          >
+            + Agregar a la lista
+          </button>
+        </div>
+      </div>
+
+      {lineas.length > 0 && (
+        <div className="overflow-x-auto -mx-2">
+          <table className="w-full text-sm min-w-[400px]">
+            <thead>
+              <tr className="text-left text-[11px] uppercase tracking-wider text-gray-400 border-b border-border">
+                <th className="py-2 px-2 font-semibold">Artículo</th>
+                <th className="py-2 px-2 font-semibold text-right">Cantidad</th>
+                <th className="py-2 px-2 font-semibold text-right">Quitar</th>
+              </tr>
+            </thead>
+            <tbody>
+              {lineas.map((l) => (
+                <tr key={l.itemId} className="border-b border-border/60">
+                  <td className="py-2 px-2 text-gray-800">{l.presentacion}</td>
+                  <td className="py-2 px-2 text-right font-bold tabular-nums">{l.cantidad}</td>
+                  <td className="py-2 px-2 text-right">
+                    <button
+                      type="button"
+                      onClick={() => removeLinea(l.itemId)}
+                      className="text-xs text-crisis hover:underline"
+                    >
+                      Quitar
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      <div>
+        <label className={labelCls}>Nota (opcional)</label>
+        <textarea
+          rows={2}
+          value={nota}
+          onChange={(e) => setNota(e.target.value)}
+          placeholder="Observaciones adicionales…"
+          className={textareaCls}
+        />
+      </div>
+
+      <button
+        type="submit"
+        disabled={submitting || lineas.length === 0 || !locationOrigenId || !locationDestinoId}
+        className="w-full bg-gray-800 hover:bg-gray-900 text-white font-bold py-3 rounded-lg shadow-sm transition-colors text-sm tracking-wide disabled:opacity-60 disabled:cursor-not-allowed"
+      >
+        {submitting ? "TRASLADANDO…" : "CONFIRMAR TRASLADO"}
+      </button>
     </form>
   );
 }
