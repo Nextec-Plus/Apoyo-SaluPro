@@ -36,7 +36,6 @@ export function Combobox({
   const [search, setSearch] = useState("");
   const [creating, setCreating] = useState(false);
   const [createName, setCreateName] = useState("");
-  const [createCode, setCreateCode] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -87,7 +86,6 @@ export function Combobox({
         setCreating(false);
         setSearch("");
         setCreateName("");
-        setCreateCode("");
       }
     } finally {
       setSubmitting(false);
@@ -185,26 +183,18 @@ export function Combobox({
                 className="w-full text-sm bg-white border border-border rounded-lg px-3 py-2.5 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-ring focus:border-primary"
                 onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleCreate(); } }}
               />
-              <input
-                type="text"
-                value={createCode}
-                onChange={(e) => setCreateCode(e.target.value)}
-                placeholder="Código (ej: MED, ALIM)"
-                className="w-full text-sm bg-white border border-border rounded-lg px-3 py-2.5 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-ring focus:border-primary"
-                onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleCreate(); } }}
-              />
               <div className="flex gap-2">
                 <button
                   type="button"
                   onClick={handleCreate}
-                  disabled={submitting || !createName.trim() || !createCode.trim()}
+                  disabled={submitting || !createName.trim()}
                   className="flex-1 bg-primary hover:bg-primary/90 text-white font-bold text-sm py-2.5 rounded-lg disabled:opacity-60 transition-colors"
                 >
                   {submitting ? "Creando..." : "Crear"}
                 </button>
                 <button
                   type="button"
-                  onClick={() => { setCreating(false); setCreateName(""); setCreateCode(""); }}
+                  onClick={() => { setCreating(false); setCreateName(""); }}
                   className="px-4 text-sm text-gray-500 hover:text-gray-700 font-medium"
                 >
                   Cancelar

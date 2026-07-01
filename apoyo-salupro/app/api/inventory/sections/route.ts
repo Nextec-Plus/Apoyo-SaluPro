@@ -1,5 +1,6 @@
 import type { NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { generateUniqueCode } from '@/lib/inventory/generate-code'
 
 /**
  * GET /api/inventory/sections
@@ -33,21 +34,21 @@ export async function GET() {
 
 /**
  * POST /api/inventory/sections
- * Crea una nueva sección (categoría global).
- * Body: { code, name }
+ * Crea una nueva sección (categoría global). El código se genera a partir del nombre.
+ * Body: { name }
  */
 export async function POST(request: NextRequest) {
   const supabase = await createClient()
 
-  let body: { code?: string; name?: string }
+  let body: { name?: string }
   try { body = await request.json() } catch {
     return Response.json({ data: null, error: 'JSON inválido' }, { status: 400 })
   }
 
-  const code = body.code?.trim()
   const name = body.name?.trim()
-  if (!code) return Response.json({ data: null, error: 'code es requerido' }, { status: 400 })
   if (!name) return Response.json({ data: null, error: 'name es requerido' }, { status: 400 })
+
+  const code = await generateUniqueCode(supabase, 'inventory_sections', name)
 
   const { data: maxOrder } = await supabase
     .from('inventory_sections')

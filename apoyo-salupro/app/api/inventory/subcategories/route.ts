@@ -1,5 +1,6 @@
 import type { NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { generateUniqueCode } from '@/lib/inventory/generate-code'
 
 /**
  * GET /api/inventory/subcategories
@@ -26,23 +27,23 @@ export async function GET(request: NextRequest) {
 
 /**
  * POST /api/inventory/subcategories
- * Crea una nueva subcategoría dentro de una sección.
- * Body: { section_id, code, name }
+ * Crea una nueva subcategoría dentro de una sección. El código se genera a partir del nombre.
+ * Body: { section_id, name }
  */
 export async function POST(request: NextRequest) {
   const supabase = await createClient()
 
-  let body: { section_id?: string; code?: string; name?: string }
+  let body: { section_id?: string; name?: string }
   try { body = await request.json() } catch {
     return Response.json({ data: null, error: 'JSON inválido' }, { status: 400 })
   }
 
   if (!body.section_id) return Response.json({ data: null, error: 'section_id es requerido' }, { status: 400 })
 
-  const code = body.code?.trim()
   const name = body.name?.trim()
-  if (!code) return Response.json({ data: null, error: 'code es requerido' }, { status: 400 })
   if (!name) return Response.json({ data: null, error: 'name es requerido' }, { status: 400 })
+
+  const code = await generateUniqueCode(supabase, 'inventory_subcategories', name)
 
   const { data: maxOrder } = await supabase
     .from('inventory_subcategories')

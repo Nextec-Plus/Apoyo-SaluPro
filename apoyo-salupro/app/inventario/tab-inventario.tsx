@@ -66,12 +66,10 @@ export function TabInventario() {
   }, [loadItems, loadSections, loadLocations]);
 
   const createSection = useCallback(async (name: string): Promise<string | null> => {
-    const code = prompt("Código de la categoría (ej: MED, ALIM, LIMP):");
-    if (!code) return null;
     const res = await fetch("/api/inventory/sections", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ code: code.trim().toUpperCase(), name }),
+      body: JSON.stringify({ name }),
     });
     const json = await res.json();
     if (!res.ok || json.error) {
@@ -84,12 +82,10 @@ export function TabInventario() {
   }, [loadSections, toast]);
 
   const createSubcategory = useCallback(async (sectionId: string, name: string): Promise<string | null> => {
-    const code = prompt("Código de la subcategoría (ej: ANALG, INHAL, JABON):");
-    if (!code) return null;
     const res = await fetch("/api/inventory/subcategories", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ section_id: sectionId, code: code.trim().toUpperCase(), name }),
+      body: JSON.stringify({ section_id: sectionId, name }),
     });
     const json = await res.json();
     if (!res.ok || json.error) {
