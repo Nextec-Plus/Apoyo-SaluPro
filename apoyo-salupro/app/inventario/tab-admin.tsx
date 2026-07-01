@@ -4,7 +4,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useToast } from "@/components/toast-provider";
 import type { ItemRow, SectionWithSubcats } from "./types";
 import type { InventoryLocation } from "@/lib/types/database";
-import { CascadeStep, inputCls, inputDisabledCls, labelCls } from "./cascade-step";
+import { Combobox } from "@/components/ui/combobox";
+import { inputCls, labelCls } from "./cascade-step";
 
 export function TabAdmin() {
   const toast = useToast();
@@ -47,6 +48,58 @@ export function TabAdmin() {
 
   useEffect(() => { reloadAll(); }, [reloadAll]);
 
+  const createSection = useCallback(async (name: string): Promise<string | null> => {
+    const code = prompt("Código de la categoría (ej: MED, ALIM, LIMP):");
+    if (!code) return null;
+    const res = await fetch("/api/inventory/sections", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ code: code.trim().toUpperCase(), name }),
+    });
+    const json = await res.json();
+    if (!res.ok || json.error) {
+      toast.error(json.error || "No se pudo crear la categoría");
+      return null;
+    }
+    toast.success(`Categoría "${json.data.name}" creada`);
+    await loadSections();
+    return json.data.id;
+  }, [loadSections, toast]);
+
+  const createSubcategory = useCallback(async (sectionId: string, name: string): Promise<string | null> => {
+    const code = prompt("Código de la subcategoría (ej: ANALG, INHAL, JABON):");
+    if (!code) return null;
+    const res = await fetch("/api/inventory/subcategories", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ section_id: sectionId, code: code.trim().toUpperCase(), name }),
+    });
+    const json = await res.json();
+    if (!res.ok || json.error) {
+      toast.error(json.error || "No se pudo crear la subcategoría");
+      return null;
+    }
+    toast.success(`Subcategoría "${json.data.name}" creada`);
+    await loadSections();
+    return json.data.id;
+  }, [loadSections, toast]);
+
+  const createLocation = useCallback(async (name: string): Promise<string | null> => {
+    const res = await fetch("/api/inventory/locations", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name }),
+    });
+    const json = await res.json();
+    if (!res.ok || json.error) {
+      toast.error(json.error || "No se pudo crear la ubicación");
+      return null;
+    }
+    toast.success(`Ubicación "${json.data.name}" creada`);
+    await loadLocations();
+    return json.data.id;
+  }, [loadLocations, toast]);
+
   return (
     <div className="bg-white rounded-xl shadow-sm border border-border p-6">
       <div className="border-b border-border pb-3 mb-6 flex flex-wrap items-end justify-between gap-3">
@@ -63,7 +116,10 @@ export function TabAdmin() {
         items={items}
         locations={locations}
         loading={loading}
-        onChanged={async () => { await Promise.all([loadItems()]); }}
+        onChanged={async () => { await loadItems(); }}
+        onCreateSection={createSection}
+        onCreateSubcategory={createSubcategory}
+        onCreateLocation={createLocation}
       />
     </div>
   );
@@ -77,16 +133,23 @@ function ArticulosPanel({
   locations,
   loading,
   onChanged,
+  onCreateSection,
+  onCreateSubcategory,
+  onCreateLocation,
 }: {
   sections: SectionWithSubcats[];
   items: ItemRow[];
   locations: InventoryLocation[];
   loading: boolean;
   onChanged: () => Promise<void>;
+  onCreateSection: (name: string) => Promise<string | null>;
+  onCreateSubcategory: (sectionId: string, name: string) => Promise<string | null>;
+  onCreateLocation: (name: string) => Promise<string | null>;
 }) {
   const toast = useToast();
   const [sectionId, setSectionId] = useState("");
   const [subcategoryId, setSubcategoryId] = useState("");
+  const [locationId, setLocationId] = useState("");
   const [presentacion, setPresentacion] = useState("");
   const [stockInicial, setStockInicial] = useState("");
   const [creating, setCreating] = useState(false);
@@ -95,6 +158,21 @@ function ArticulosPanel({
   const selectedSection = useMemo(
     () => sections.find((s) => s.id === sectionId) ?? null,
     [sections, sectionId],
+  );
+
+  const sectionItems = useMemo(
+    () => sections.map((s) => ({ id: s.id, label: `${s.code}. ${s.name}` })),
+    [sections],
+  );
+
+  const subcategoryItems = useMemo(
+    () => (selectedSection?.subcategories ?? []).map((sc) => ({ id: sc.id, label: sc.name })),
+    [selectedSection],
+  );
+
+  const locationItems = useMemo(
+    () => locations.map((l) => ({ id: l.id, label: l.name })),
+    [locations],
   );
 
   const create = async (e: React.FormEvent) => {
@@ -114,7 +192,7 @@ function ArticulosPanel({
         body: JSON.stringify({
           subcategory_id: subcategoryId,
           presentacion: pres,
-          location_id: null,
+          location_id: locationId || null,
         }),
       });
       const json = await res.json();
@@ -123,7 +201,6 @@ function ArticulosPanel({
         throw new Error(json.error || "No se pudo crear el artículo");
       }
 
-      // Carga inicial: registrar movimiento de entrada si stock0 > 0
       if (stock0 > 0) {
         const mvRes = await fetch("/api/inventory/movements", {
           method: "POST",
@@ -144,6 +221,7 @@ function ArticulosPanel({
 
       setPresentacion("");
       setStockInicial("");
+      setLocationId("");
       await onChanged();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Error inesperado");
@@ -167,7 +245,6 @@ function ArticulosPanel({
 
   return (
     <div className="space-y-6">
-      {/* Formulario de alta */}
       <form onSubmit={create} className="bg-muted border border-border rounded-lg p-4 space-y-4">
         <h3 className="text-[11px] font-bold uppercase tracking-widest text-gray-400">
           Registrar artículo
@@ -176,51 +253,39 @@ function ArticulosPanel({
           Cada artículo = subcategoría + presentación específica (ej: {'\u201C'}Pediátricos · Jarabe 120ml{'\u201D'}).
           Si indicas un stock inicial, se registra automáticamente como carga inicial en el kardex.
         </p>
-        {/* Cascada Categoría → Subcategoría */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <CascadeStep
-            step={1}
-            label="Categoría"
-            active={!!sectionId}
-            blocked={false}
-          >
-            <select
+          <div>
+            <label className={labelCls}>Categoría</label>
+            <Combobox
+              items={sectionItems}
               value={sectionId}
-              onChange={(e) => { setSectionId(e.target.value); setSubcategoryId(""); }}
-              className={inputCls}
-            >
-              <option value="">— Seleccione —</option>
-              {sections.map((s) => (
-                <option key={s.id} value={s.id}>{s.code}. {s.name}</option>
-              ))}
-            </select>
-          </CascadeStep>
-          <CascadeStep
-            step={2}
-            label="Subcategoría"
-            active={!!subcategoryId}
-            blocked={!sectionId}
-            blockHint="Selecciona primero la categoría"
-            onBlockedClick={() => toast.info("Primero selecciona una categoría")}
-          >
-            <select
+              onChange={(id) => { setSectionId(id); setSubcategoryId(""); }}
+              placeholder="Seleccione categoría..."
+              createLabel="Crear nueva categoría"
+              createPlaceholder="Nombre de la categoría"
+              onCreate={onCreateSection}
+            />
+          </div>
+          <div>
+            <label className={labelCls}>Subcategoría</label>
+            <Combobox
+              items={subcategoryItems}
               value={subcategoryId}
-              onChange={(e) => setSubcategoryId(e.target.value)}
-              className={!sectionId ? inputDisabledCls : inputCls}
+              onChange={setSubcategoryId}
+              placeholder="Seleccione subcategoría..."
               disabled={!sectionId}
-            >
-              <option value="">— Seleccione —</option>
-              {(selectedSection?.subcategories ?? []).map((sc) => (
-                <option key={sc.id} value={sc.id}>{sc.code} {sc.name}</option>
-              ))}
-            </select>
-          </CascadeStep>
+              emptyText="Selecciona primero la categoría"
+              createLabel="Crear nueva subcategoría"
+              createPlaceholder="Nombre de la subcategoría"
+              onCreate={sectionId ? (name) => onCreateSubcategory(sectionId, name) : undefined}
+            />
+          </div>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <div>
             <label className={labelCls}>
               Presentación{" "}
-              <span className="font-normal text-gray-400">(nombre específico del artículo)</span>
+              <span className="font-normal text-gray-400">(nombre específico)</span>
             </label>
             <input
               value={presentacion}
@@ -232,7 +297,7 @@ function ArticulosPanel({
           <div>
             <label className={labelCls}>
               Stock inicial{" "}
-              <span className="font-normal text-gray-400">(unidades — opcional, 0 por defecto)</span>
+              <span className="font-normal text-gray-400">(opcional, 0 por defecto)</span>
             </label>
             <input
               type="number"
@@ -248,6 +313,20 @@ function ArticulosPanel({
                 ✓ Se registrará una entrada de <strong>{stockInicial}</strong> unidades como {'\u201C'}Carga inicial{'\u201D'} en el kardex.
               </p>
             )}
+          </div>
+          <div>
+            <label className={labelCls}>Ubicación</label>
+            <Combobox
+              items={locationItems}
+              value={locationId}
+              onChange={setLocationId}
+              placeholder="Seleccione ubicación..."
+              disabled={!sectionId || !subcategoryId}
+              emptyText={!sectionId ? "Selecciona categoría y subcategoría" : "Sin ubicaciones"}
+              createLabel="Crear nueva ubicación"
+              createPlaceholder="Nombre de la ubicación"
+              onCreate={onCreateLocation}
+            />
           </div>
         </div>
         <button
@@ -288,6 +367,7 @@ function ArticulosPanel({
                       <EditLocationInline
                         item={it}
                         locations={locations}
+                        onCreateLocation={onCreateLocation}
                         onSaved={async () => { setEditingId(null); await onChanged(); }}
                         onCancel={() => setEditingId(null)}
                       />
@@ -295,7 +375,7 @@ function ArticulosPanel({
                       it.presentacion
                     )}
                   </td>
-                  <td className="py-2 px-2 text-xs text-gray-500">{it.location?.name ?? it.subcategory?.code ?? "—"}</td>
+                  <td className="py-2 px-2 text-xs text-gray-500">{it.location?.name ?? "—"}</td>
                   <td className="py-2 px-2 text-right tabular-nums font-semibold text-gray-800">{it.stock}</td>
                   <td className="py-2 px-2 text-right whitespace-nowrap">
                     {editingId !== it.id && (
@@ -330,17 +410,22 @@ function ArticulosPanel({
 function EditLocationInline({
   item,
   locations,
+  onCreateLocation,
   onSaved,
   onCancel,
 }: {
   item: ItemRow;
   locations: InventoryLocation[];
+  onCreateLocation: (name: string) => Promise<string | null>;
   onSaved: () => Promise<void>;
   onCancel: () => void;
 }) {
   const toast = useToast();
   const [locationId, setLocationId] = useState(item.location_id ?? "");
   const [saving, setSaving] = useState(false);
+
+  const locationItems = locations.map((l) => ({ id: l.id, label: l.name }));
+  locationItems.unshift({ id: "", label: "Sin ubicación" });
 
   const save = async () => {
     setSaving(true);
@@ -363,20 +448,24 @@ function EditLocationInline({
 
   return (
     <div className="flex items-center gap-2">
-      <span className="text-gray-800">{item.presentacion}</span>
-      <select
-        value={locationId}
-        onChange={(e) => setLocationId(e.target.value)}
-        className="text-xs bg-white border border-border rounded px-2 py-1 focus:outline-none"
-      >
-        <option value="">Sin ubicación</option>
-        {locations.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
-      </select>
+      <span className="text-gray-800 shrink-0">{item.presentacion}</span>
+      <div className="min-w-[200px]">
+        <Combobox
+          items={locationItems}
+          value={locationId}
+          onChange={setLocationId}
+          placeholder="Ubicación..."
+          emptyText="Sin ubicaciones"
+          createLabel="Crear nueva ubicación"
+          createPlaceholder="Nombre de la ubicación"
+          onCreate={onCreateLocation}
+        />
+      </div>
       <button type="button" onClick={save} disabled={saving}
-        className="text-xs font-bold text-primary hover:underline disabled:opacity-60">
+        className="text-xs font-bold text-primary hover:underline disabled:opacity-60 shrink-0">
         {saving ? "…" : "OK"}
       </button>
-      <button type="button" onClick={onCancel} className="text-xs text-gray-400 hover:text-gray-700">✕</button>
+      <button type="button" onClick={onCancel} className="text-xs text-gray-400 hover:text-gray-700 shrink-0">✕</button>
     </div>
   );
 }
