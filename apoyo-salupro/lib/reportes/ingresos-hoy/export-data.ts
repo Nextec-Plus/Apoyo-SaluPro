@@ -87,8 +87,9 @@ const INFO_EMBED =
 export async function buildIngresosHoyPayload(
   organizationId: string,
   supabase: SupabaseClient<Database>,
+  fechaVetOverride?: string,
 ): Promise<IngresosHoyPayload> {
-  const { startUtc, endUtc, fechaVet } = getIngresosHoyUtcBounds();
+  const { startUtc, endUtc, fechaVet } = getIngresosHoyUtcBounds(new Date(), fechaVetOverride);
 
   const data: IngresosHoyRow[] = [];
   const PAGE = 500;
@@ -135,9 +136,9 @@ export async function buildIngresosHoyPayload(
   });
 
   return {
-    title: "Ingresos del día de hoy — Apoyo SaluPro",
+    title: `Ingresos del ${fechaVet} — Apoyo SaluPro`,
     subtitle: `${fechaVet} · ${rows.length} registro(s)`,
-    filenameBase: `ingresos-hoy-${fechaVet}`,
+    filenameBase: `ingresos-${fechaVet}`,
     headers: HEADERS,
     rows,
   };
