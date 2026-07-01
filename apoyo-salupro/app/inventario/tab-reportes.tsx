@@ -28,6 +28,7 @@ export function TabReportes() {
   const [data, setData] = useState<ReportData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [exporting, setExporting] = useState(false);
 
   const range = useMemo(() => {
     const p = PRESETS.find((x) => x.id === preset)!;
@@ -54,8 +55,26 @@ export function TabReportes() {
 
   useEffect(() => { load(); }, [load]);
 
-  const handleExport = () => {
-    if (typeof window !== "undefined") window.print();
+  const handleExport = async () => {
+    setExporting(true);
+    try {
+      const params = new URLSearchParams({ from: range.from, to: range.to });
+      const res = await fetch(`/api/inventory/reports/pdf?${params}`, { cache: "no-store" });
+      if (!res.ok) throw new Error("No se pudo generar el PDF");
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `reporte-salupro-${new Date().toISOString().slice(0, 10)}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch {
+      setError("No se pudo generar el PDF. Intenta de nuevo.");
+    } finally {
+      setExporting(false);
+    }
   };
 
   const views: { v: ReportView; label: string; icon: string }[] = [
@@ -63,7 +82,7 @@ export function TabReportes() {
     { v: "control", label: "Control y Alertas", icon: "🚨" },
   ];
 
-  const puntos = (data?.solicitudes.geo ?? []).map((g) => ({ lat: g.lat, lng: g.lng, weight: 1 }));
+  const puntos = data?.solicitudes.geo ?? [];
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-border p-6">
@@ -80,13 +99,25 @@ export function TabReportes() {
           <button
             type="button"
             onClick={handleExport}
-            disabled={loading || !!error}
+            disabled={loading || !!error || exporting}
             className="inline-flex items-center gap-1.5 text-xs font-semibold text-white bg-primary hover:bg-primary-dark rounded-lg px-3.5 py-2 transition-colors disabled:opacity-50 shadow-sm shadow-primary/20"
           >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5">
-              <path d="M6 9V2h12v7M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2M6 14h12v8H6z" />
-            </svg>
-            Exportar PDF
+            {exporting ? (
+              <>
+                <svg viewBox="0 0 24 24" className="w-3.5 h-3.5 animate-spin">
+                  <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" strokeWidth="2.5" strokeOpacity="0.3" />
+                  <path d="M21 12a9 9 0 0 0-9-9" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
+                </svg>
+                Generando PDF…
+              </>
+            ) : (
+              <>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5">
+                  <path d="M6 9V2h12v7M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2M6 14h12v8H6z" />
+                </svg>
+                Exportar PDF
+              </>
+            )}
           </button>
           {/* Período */}
           <div className="flex gap-1 bg-muted rounded-lg p-1">
@@ -155,7 +186,7 @@ export function TabReportes() {
           )}
 
           <div className="h-[68vh] min-h-[460px] w-full rounded-xl border border-border overflow-hidden">
-            <MapaCalorDynamic puntos={puntos} />
+            <MapaCalorDynamic puntos={puntos} autoFullscreen />
           </div>
         </div>
       ) : (
