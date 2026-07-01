@@ -3,7 +3,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useToast } from "@/components/toast-provider";
 import type { ItemRow, MovementRow, SectionWithSubcats } from "./types";
-import { CascadeStep, inputCls, inputDisabledCls, labelCls } from "./cascade-step";
+import type { InventoryLocation } from "@/lib/types/database";
+import { Combobox } from "@/components/ui/combobox";
+import { inputCls, inputDisabledCls, labelCls } from "./cascade-step";
 
 const textareaCls = inputCls + " resize-none";
 
@@ -14,6 +16,7 @@ export function TabInventario() {
   const [subView, setSubView] = useState<SubView>("tablero");
   const [items, setItems] = useState<ItemRow[]>([]);
   const [sections, setSections] = useState<SectionWithSubcats[]>([]);
+  const [locations, setLocations] = useState<InventoryLocation[]>([]);
   const [loadingItems, setLoadingItems] = useState(true);
   const [loadingSections, setLoadingSections] = useState(true);
 
@@ -45,10 +48,74 @@ export function TabInventario() {
     }
   }, [toast]);
 
+  const loadLocations = useCallback(async () => {
+    try {
+      const res = await fetch("/api/inventory/locations", { cache: "no-store" });
+      const json = await res.json();
+      if (json.error) throw new Error(json.error);
+      setLocations(json.data ?? []);
+    } catch {
+      // Silencioso: las ubicaciones son opcionales
+    }
+  }, []);
+
   useEffect(() => {
     loadItems();
     loadSections();
-  }, [loadItems, loadSections]);
+    loadLocations();
+  }, [loadItems, loadSections, loadLocations]);
+
+  const createSection = useCallback(async (name: string): Promise<string | null> => {
+    const code = prompt("Código de la categoría (ej: MED, ALIM, LIMP):");
+    if (!code) return null;
+    const res = await fetch("/api/inventory/sections", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ code: code.trim().toUpperCase(), name }),
+    });
+    const json = await res.json();
+    if (!res.ok || json.error) {
+      toast.error(json.error || "No se pudo crear la categoría");
+      return null;
+    }
+    toast.success(`Categoría "${json.data.name}" creada`);
+    await loadSections();
+    return json.data.id;
+  }, [loadSections, toast]);
+
+  const createSubcategory = useCallback(async (sectionId: string, name: string): Promise<string | null> => {
+    const code = prompt("Código de la subcategoría (ej: ANALG, INHAL, JABON):");
+    if (!code) return null;
+    const res = await fetch("/api/inventory/subcategories", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ section_id: sectionId, code: code.trim().toUpperCase(), name }),
+    });
+    const json = await res.json();
+    if (!res.ok || json.error) {
+      toast.error(json.error || "No se pudo crear la subcategoría");
+      return null;
+    }
+    toast.success(`Subcategoría "${json.data.name}" creada`);
+    await loadSections();
+    return json.data.id;
+  }, [loadSections, toast]);
+
+  const createLocation = useCallback(async (name: string): Promise<string | null> => {
+    const res = await fetch("/api/inventory/locations", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name }),
+    });
+    const json = await res.json();
+    if (!res.ok || json.error) {
+      toast.error(json.error || "No se pudo crear la ubicación");
+      return null;
+    }
+    toast.success(`Ubicación "${json.data.name}" creada`);
+    await loadLocations();
+    return json.data.id;
+  }, [loadLocations, toast]);
 
   const subViewOpts: { v: SubView; label: string }[] = [
     { v: "tablero", label: "Tablero" },
@@ -90,8 +157,12 @@ export function TabInventario() {
           tipo="entrada"
           items={items}
           sections={sections}
+          locations={locations}
           loading={loadingItems || loadingSections}
           onCreated={loadItems}
+          onCreateSection={createSection}
+          onCreateSubcategory={createSubcategory}
+          onCreateLocation={createLocation}
         />
       )}
       {subView === "salida" && (
@@ -99,8 +170,12 @@ export function TabInventario() {
           tipo="salida"
           items={items}
           sections={sections}
+          locations={locations}
           loading={loadingItems || loadingSections}
           onCreated={loadItems}
+          onCreateSection={createSection}
+          onCreateSubcategory={createSubcategory}
+          onCreateLocation={createLocation}
         />
       )}
       {subView === "kardex" && (
@@ -158,7 +233,7 @@ function Tablero({ items, loading }: { items: ItemRow[]; loading: boolean }) {
                     <td className="py-2 px-2">
                       <div className="font-medium text-gray-800">{it.presentacion}</div>
                     </td>
-                    <td className="py-2 px-2 text-gray-500 text-xs">{it.location?.name ?? it.subcategory?.code ?? "—"}</td>
+                    <td className="py-2 px-2 text-gray-500 text-xs">{it.location?.name ?? "—"}</td>
                     <td className="py-2 px-2 text-right">
                       <span className={`font-bold tabular-nums text-sm ${it.stock === 0 ? "text-crisis" : it.stock < 5 ? "text-amber-600" : "text-gray-800"}`}>
                         {it.stock}
@@ -181,19 +256,28 @@ function MovimientoForm({
   tipo,
   items,
   sections,
+  locations,
   loading,
   onCreated,
+  onCreateSection,
+  onCreateSubcategory,
+  onCreateLocation,
 }: {
   tipo: "entrada" | "salida";
   items: ItemRow[];
   sections: SectionWithSubcats[];
+  locations: InventoryLocation[];
   loading: boolean;
   onCreated: () => void;
+  onCreateSection: (name: string) => Promise<string | null>;
+  onCreateSubcategory: (sectionId: string, name: string) => Promise<string | null>;
+  onCreateLocation: (name: string) => Promise<string | null>;
 }) {
   const toast = useToast();
   const [sectionId, setSectionId] = useState("");
   const [subcategoryId, setSubcategoryId] = useState("");
   const [itemId, setItemId] = useState("");
+  const [locationId, setLocationId] = useState("");
   const [cantidad, setCantidad] = useState("");
   const [entregadoPor, setEntregadoPor] = useState("");
   const [destinatario, setDestinatario] = useState("");
@@ -219,6 +303,21 @@ function MovimientoForm({
     return items.filter((it) => it.subcategory?.id === subcategoryId);
   }, [items, subcategoryId]);
 
+  const sectionItems = useMemo(
+    () => sections.map((s) => ({ id: s.id, label: `${s.code}. ${s.name}` })),
+    [sections],
+  );
+
+  const subcategoryItems = useMemo(
+    () => (selectedSection?.subcategories ?? []).map((sc) => ({ id: sc.id, label: sc.name })),
+    [selectedSection],
+  );
+
+  const locationItems = useMemo(
+    () => locations.map((l) => ({ id: l.id, label: l.name })),
+    [locations],
+  );
+
   const quickCreate = async () => {
     const nombre = quickNombre.trim();
     if (!nombre) return toast.error("El nombre del artículo es obligatorio.");
@@ -233,6 +332,7 @@ function MovimientoForm({
         body: JSON.stringify({
           subcategory_id: subcategoryId,
           presentacion: nombre,
+          location_id: locationId || null,
         }),
       });
       const json = await res.json();
@@ -285,6 +385,7 @@ function MovimientoForm({
           item_id: itemId,
           tipo,
           cantidad: cant,
+          location_id: locationId || null,
           entregado_por: tipo === "entrada" ? entregadoPor.trim() || null : null,
           destinatario: tipo === "salida" ? destinatario.trim() || null : null,
           medio_transporte: tipo === "salida" ? medioTransporte.trim() || null : null,
@@ -328,65 +429,47 @@ function MovimientoForm({
           : "💡 Registra materiales que salen del centro hacia un destinatario."}
       </p>
 
-      {/* Selectores en cascada: Categoría → Subcategoría → Artículo */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <CascadeStep
-          step={1}
-          label="Categoría"
-          active={!!sectionId}
-          blocked={false}
-        >
-          <select
+        <div>
+          <label className={labelCls}>Categoría</label>
+          <Combobox
+            items={sectionItems}
             value={sectionId}
-            onChange={(e) => {
-              setSectionId(e.target.value);
+            onChange={(id) => {
+              setSectionId(id);
               setSubcategoryId("");
               setItemId("");
               setShowQuickCreate(false);
             }}
-            className={loading ? inputDisabledCls : inputCls}
+            placeholder="Seleccione..."
             disabled={loading}
-          >
-            <option value="">— Seleccione —</option>
-            {sections.map((s) => (
-              <option key={s.id} value={s.id}>{s.name}</option>
-            ))}
-          </select>
-        </CascadeStep>
+            createLabel="Crear nueva categoría"
+            createPlaceholder="Nombre de la categoría"
+            onCreate={onCreateSection}
+          />
+        </div>
 
-        <CascadeStep
-          step={2}
-          label="Subcategoría"
-          active={!!subcategoryId}
-          blocked={!sectionId}
-          blockHint="Selecciona primero la categoría"
-          onBlockedClick={() => toast.info("Primero selecciona una categoría")}
-        >
-          <select
+        <div>
+          <label className={labelCls}>Subcategoría</label>
+          <Combobox
+            items={subcategoryItems}
             value={subcategoryId}
-            onChange={(e) => {
-              setSubcategoryId(e.target.value);
+            onChange={(id) => {
+              setSubcategoryId(id);
               setItemId("");
               setShowQuickCreate(false);
             }}
-            className={!sectionId ? inputDisabledCls : inputCls}
+            placeholder="Seleccione..."
             disabled={!sectionId}
-          >
-            <option value="">— Seleccione —</option>
-            {(selectedSection?.subcategories ?? []).map((sc) => (
-              <option key={sc.id} value={sc.id}>{sc.name}</option>
-            ))}
-          </select>
-        </CascadeStep>
+            emptyText="Selecciona primero la categoría"
+            createLabel="Crear nueva subcategoría"
+            createPlaceholder="Nombre de la subcategoría"
+            onCreate={sectionId ? (name) => onCreateSubcategory(sectionId, name) : undefined}
+          />
+        </div>
 
-        <CascadeStep
-          step={3}
-          label="Artículo"
-          active={!!itemId}
-          blocked={!subcategoryId}
-          blockHint="Selecciona primero la subcategoría"
-          onBlockedClick={() => toast.info("Primero selecciona una subcategoría")}
-        >
+        <div>
+          <label className={labelCls}>Artículo</label>
           <select
             value={itemId}
             onChange={(e) => {
@@ -399,6 +482,8 @@ function MovimientoForm({
               }
               setItemId(val);
               setShowQuickCreate(false);
+              const found = items.find((it) => it.id === val);
+              if (found) setLocationId(found.location_id ?? "");
             }}
             className={!subcategoryId ? inputDisabledCls : inputCls}
             disabled={!subcategoryId}
@@ -406,10 +491,11 @@ function MovimientoForm({
             <option value="">— Seleccione —</option>
             {filteredItems.map((it) => {
               const d = tipo === "salida" && it.stock === 0;
+              const loc = it.location?.name ? ` 📍${it.location.name}` : "";
               return (
                 <option key={it.id} value={it.id} disabled={d}>
                   {it.presentacion}
-                  {tipo === "salida" ? ` (${it.stock} disp.)` : ` (${it.stock})`}
+                  {tipo === "salida" ? ` (${it.stock} disp.)` : ` (${it.stock})`}{loc}
                 </option>
               );
             })}
@@ -419,10 +505,9 @@ function MovimientoForm({
               </option>
             )}
           </select>
-        </CascadeStep>
+        </div>
       </div>
 
-      {/* Empty state cuando la subcategoría existe pero no tiene artículos */}
       {subcategoryId && !itemId && filteredItems.length === 0 && !showQuickCreate && (
         <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-800 flex items-center gap-2">
           <span className="text-base">📦</span>
@@ -430,7 +515,6 @@ function MovimientoForm({
         </div>
       )}
 
-      {/* Quick-create inline */}
       {showQuickCreate && subcategoryId && (
         <div className="flex items-end gap-3 bg-primary/5 border border-primary/20 rounded-lg p-3 animate-in fade-in">
           <div className="flex-1">
@@ -476,32 +560,45 @@ function MovimientoForm({
 
       {selected && (
         <p className="text-[11px] text-gray-400 mt-1">
-          📍 {selected.location?.name ?? selected.subcategory?.code ?? "Sin ubicación asignada"}
+          📍 {selected.location?.name ?? "Sin ubicación asignada"}
           {tipo === "salida" && <span className="ml-3 font-semibold text-gray-600">Stock: {selected.stock}</span>}
         </p>
       )}
 
-      {/* Cantidad */}
-      <div className="w-40">
-        <label className={labelCls}>
-          Cantidad
-          {tipo === "salida" && selected && (
-            <span className="ml-2 font-normal text-gray-400">máx: {selected.stock}</span>
-          )}
-        </label>
-        <input
-          ref={cantidadRef}
-          type="number"
-          min={1}
-          max={tipo === "salida" && selected ? selected.stock : undefined}
-          value={cantidad}
-          onChange={(e) => setCantidad(e.target.value)}
-          placeholder="0"
-          className={inputCls}
-        />
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <label className={labelCls}>Ubicación (opcional)</label>
+          <Combobox
+            items={locationItems}
+            value={locationId}
+            onChange={setLocationId}
+            placeholder="Seleccione ubicación..."
+            emptyText="Sin ubicaciones"
+            createLabel="Crear nueva ubicación"
+            createPlaceholder="Nombre de la ubicación"
+            onCreate={onCreateLocation}
+          />
+        </div>
+        <div>
+          <label className={labelCls}>
+            Cantidad
+            {tipo === "salida" && selected && (
+              <span className="ml-2 font-normal text-gray-400">máx: {selected.stock}</span>
+            )}
+          </label>
+          <input
+            ref={cantidadRef}
+            type="number"
+            min={1}
+            max={tipo === "salida" && selected ? selected.stock : undefined}
+            value={cantidad}
+            onChange={(e) => setCantidad(e.target.value)}
+            placeholder="0"
+            className={inputCls}
+          />
+        </div>
       </div>
 
-      {/* Campos específicos por tipo */}
       {tipo === "entrada" && (
         <div>
           <label className={labelCls}>Quién entrega (opcional)</label>

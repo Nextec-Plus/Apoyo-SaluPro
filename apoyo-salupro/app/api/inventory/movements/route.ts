@@ -51,7 +51,7 @@ export async function GET(request: NextRequest) {
 /**
  * POST /api/inventory/movements
  * Registra una entrada o salida. El trigger actualiza el stock atómicamente.
- * Body: { item_id, tipo, cantidad, entregado_por?, destinatario?, medio_transporte?, nota? }
+ * Body: { item_id, tipo, cantidad, location_id?, entregado_por?, destinatario?, medio_transporte?, nota? }
  */
 export async function POST(request: NextRequest) {
   const supabase = await createClient()
@@ -62,6 +62,7 @@ export async function POST(request: NextRequest) {
     item_id?: string
     tipo?: InventoryMovementType
     cantidad?: number
+    location_id?: string | null
     entregado_por?: string | null
     destinatario?: string | null
     medio_transporte?: string | null
@@ -87,6 +88,7 @@ export async function POST(request: NextRequest) {
       item_id: body.item_id,
       tipo: body.tipo,
       cantidad,
+      location_id: body.location_id || null,
       entregado_por: body.entregado_por?.trim() || null,
       destinatario: body.destinatario?.trim() || null,
       medio_transporte: body.medio_transporte?.trim() || null,
