@@ -218,7 +218,7 @@ function Tablero({ items, loading }: { items: ItemRow[]; loading: boolean }) {
                 <tr className="text-left text-[11px] uppercase tracking-wider text-gray-400 border-b border-border">
                   <th className="py-2 px-2 font-semibold">Subcategoría</th>
                   <th className="py-2 px-2 font-semibold">Presentación</th>
-                  <th className="py-2 px-2 font-semibold">Ubicación</th>
+                  <th className="py-2 px-2 font-semibold">Ubicaciones</th>
                   <th className="py-2 px-2 font-semibold text-right">Stock</th>
                 </tr>
               </thead>
@@ -229,7 +229,19 @@ function Tablero({ items, loading }: { items: ItemRow[]; loading: boolean }) {
                     <td className="py-2 px-2">
                       <div className="font-medium text-gray-800">{it.presentacion}</div>
                     </td>
-                    <td className="py-2 px-2 text-gray-500 text-xs">{it.location?.name ?? "—"}</td>
+                    <td className="py-2 px-2 text-gray-500 text-xs">
+                      {it.stock_locations.length === 0 ? (
+                        "—"
+                      ) : (
+                        <div className="flex flex-wrap gap-1">
+                          {it.stock_locations.map((l) => (
+                            <span key={l.location_id} className="inline-block bg-muted border border-border rounded px-1.5 py-0.5 whitespace-nowrap">
+                              {l.location_name}: {l.stock}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </td>
                     <td className="py-2 px-2 text-right">
                       <span className={`font-bold tabular-nums text-sm ${it.stock === 0 ? "text-crisis" : it.stock < 5 ? "text-amber-600" : "text-gray-800"}`}>
                         {it.stock}
@@ -314,9 +326,15 @@ function MovimientoForm({
     [locations],
   );
 
+  const stockAtLocation = useMemo(() => {
+    if (!selected || !locationId) return 0;
+    return selected.stock_locations.find((l) => l.location_id === locationId)?.stock ?? 0;
+  }, [selected, locationId]);
+
   const quickCreate = async () => {
     const nombre = quickNombre.trim();
     if (!nombre) return toast.error("El nombre del artículo es obligatorio.");
+    if (!locationId) return toast.error("Seleccione la ubicación de la carga inicial.");
     const cant = Number(quickCantidad);
     if (!Number.isFinite(cant) || cant <= 0) return toast.error("Cantidad inicial debe ser mayor a 0.");
 
@@ -328,7 +346,6 @@ function MovimientoForm({
         body: JSON.stringify({
           subcategory_id: subcategoryId,
           presentacion: nombre,
-          location_id: locationId || null,
         }),
       });
       const json = await res.json();
@@ -345,6 +362,7 @@ function MovimientoForm({
           item_id: newItemId,
           tipo: "entrada",
           cantidad: cant,
+          location_id: locationId,
           nota: "Carga inicial rápida",
         }),
       });
@@ -367,10 +385,11 @@ function MovimientoForm({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!itemId) return toast.error("Seleccione un artículo.");
+    if (!locationId) return toast.error("Seleccione la ubicación del movimiento.");
     const cant = Number(cantidad);
     if (!Number.isFinite(cant) || cant <= 0) return toast.error("Cantidad inválida.");
-    if (tipo === "salida" && cant > (selected?.stock ?? 0))
-      return toast.error(`Stock insuficiente: solo hay ${selected?.stock ?? 0} disponibles.`);
+    if (tipo === "salida" && cant > stockAtLocation)
+      return toast.error(`Stock insuficiente en esa ubicación: solo hay ${stockAtLocation} disponibles.`);
 
     setSubmitting(true);
     try {
@@ -381,7 +400,7 @@ function MovimientoForm({
           item_id: itemId,
           tipo,
           cantidad: cant,
-          location_id: locationId || null,
+          location_id: locationId,
           entregado_por: tipo === "entrada" ? entregadoPor.trim() || null : null,
           destinatario: tipo === "salida" ? destinatario.trim() || null : null,
           medio_transporte: tipo === "salida" ? medioTransporte.trim() || null : null,
@@ -478,8 +497,7 @@ function MovimientoForm({
               }
               setItemId(val);
               setShowQuickCreate(false);
-              const found = items.find((it) => it.id === val);
-              if (found) setLocationId(found.location_id ?? "");
+              setLocationId("");
             }}
             className={!subcategoryId ? inputDisabledCls : inputCls}
             disabled={!subcategoryId}
@@ -487,11 +505,10 @@ function MovimientoForm({
             <option value="">— Seleccione —</option>
             {filteredItems.map((it) => {
               const d = tipo === "salida" && it.stock === 0;
-              const loc = it.location?.name ? ` 📍${it.location.name}` : "";
               return (
                 <option key={it.id} value={it.id} disabled={d}>
                   {it.presentacion}
-                  {tipo === "salida" ? ` (${it.stock} disp.)` : ` (${it.stock})`}{loc}
+                  {tipo === "salida" ? ` (${it.stock} disp.)` : ` (${it.stock})`}
                 </option>
               );
             })}
@@ -554,7 +571,7 @@ function MovimientoForm({
             </button>
           </div>
           <div>
-            <label className="block text-[11px] font-semibold text-gray-700 mb-1">Ubicación (opcional)</label>
+            <label className="block text-[11px] font-semibold text-gray-700 mb-1">Ubicación</label>
             <Combobox
               items={locationItems}
               value={locationId}
@@ -571,14 +588,21 @@ function MovimientoForm({
 
       {selected && (
         <p className="text-[11px] text-gray-400 mt-1">
-          📍 {selected.location?.name ?? "Sin ubicación asignada"}
-          {tipo === "salida" && <span className="ml-3 font-semibold text-gray-600">Stock: {selected.stock}</span>}
+          📍 Stock por ubicación:{" "}
+          {selected.stock_locations.length === 0
+            ? "sin stock registrado"
+            : selected.stock_locations.map((l) => `${l.location_name}: ${l.stock}`).join(" · ")}
         </p>
       )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
-          <label className={labelCls}>Ubicación (opcional)</label>
+          <label className={labelCls}>
+            Ubicación
+            {tipo === "salida" && locationId && (
+              <span className="ml-2 font-normal text-gray-400">disp: {stockAtLocation}</span>
+            )}
+          </label>
           <Combobox
             items={locationItems}
             value={locationId}
@@ -593,15 +617,15 @@ function MovimientoForm({
         <div>
           <label className={labelCls}>
             Cantidad
-            {tipo === "salida" && selected && (
-              <span className="ml-2 font-normal text-gray-400">máx: {selected.stock}</span>
+            {tipo === "salida" && locationId && (
+              <span className="ml-2 font-normal text-gray-400">máx: {stockAtLocation}</span>
             )}
           </label>
           <input
             ref={cantidadRef}
             type="number"
             min={1}
-            max={tipo === "salida" && selected ? selected.stock : undefined}
+            max={tipo === "salida" && locationId ? stockAtLocation : undefined}
             value={cantidad}
             onChange={(e) => setCantidad(e.target.value)}
             placeholder="0"
@@ -733,7 +757,9 @@ function Kardex({ items, loadingItems }: { items: ItemRow[]; loadingItems: boole
             <p className="font-semibold text-gray-800 truncate">{selected.presentacion}</p>
             <p className="text-[11px] text-gray-400 truncate">
               {[selected.subcategory?.section?.name, selected.subcategory?.name].filter(Boolean).join(" › ")}
-              {selected.location?.name ? ` · 📍 ${selected.location.name}` : selected.subcategory?.code ? ` · 📍 ${selected.subcategory.code}` : ""}
+              {selected.stock_locations.length > 0
+                ? ` · 📍 ${selected.stock_locations.map((l) => `${l.location_name}: ${l.stock}`).join(" · ")}`
+                : selected.subcategory?.code ? ` · 📍 ${selected.subcategory.code}` : ""}
             </p>
           </div>
           <div className="text-right shrink-0">
@@ -761,9 +787,10 @@ function Kardex({ items, loadingItems }: { items: ItemRow[]; loadingItems: boole
               <tr className="text-left text-[11px] uppercase tracking-wider text-gray-400 border-b border-border">
                 <th className="py-2 px-2 font-semibold">Fecha</th>
                 <th className="py-2 px-2 font-semibold">Tipo</th>
+                <th className="py-2 px-2 font-semibold">Ubicación</th>
                 <th className="py-2 px-2 font-semibold text-right">Cant.</th>
-                <th className="py-2 px-2 font-semibold text-right">Stock ant.</th>
-                <th className="py-2 px-2 font-semibold text-right">Stock nuevo</th>
+                <th className="py-2 px-2 font-semibold text-right">Stock ubic. ant.</th>
+                <th className="py-2 px-2 font-semibold text-right">Stock ubic. nuevo</th>
                 <th className="py-2 px-2 font-semibold">Detalle</th>
               </tr>
             </thead>
@@ -790,6 +817,7 @@ function Kardex({ items, loadingItems }: { items: ItemRow[]; loadingItems: boole
                         {mv.tipo === "entrada" ? "↓ Entrada" : "↑ Salida"}
                       </span>
                     </td>
+                    <td className="py-2 px-2 text-xs text-gray-500">{mv.location?.name ?? "—"}</td>
                     <td className={`py-2 px-2 text-right font-bold tabular-nums ${mv.tipo === "entrada" ? "text-primary" : "text-amber-700"}`}>
                       {mv.tipo === "entrada" ? "+" : "-"}{mv.cantidad}
                     </td>

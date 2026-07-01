@@ -531,7 +531,6 @@ export type Database = {
           acopio_center_id: string
           subcategory_id: string
           presentacion: string
-          location_id: string | null
           stock: number
           created_at: string
           updated_at: string
@@ -541,7 +540,6 @@ export type Database = {
           acopio_center_id: string
           subcategory_id: string
           presentacion: string
-          location_id?: string | null
           stock?: number
           created_at?: string
           updated_at?: string
@@ -551,7 +549,6 @@ export type Database = {
           acopio_center_id?: string
           subcategory_id?: string
           presentacion?: string
-          location_id?: string | null
           stock?: number
           created_at?: string
           updated_at?: string
@@ -571,11 +568,56 @@ export type Database = {
             referencedRelation: "inventory_subcategories"
             referencedColumns: ["id"]
           },
+        ]
+      }
+      inventory_item_stock: {
+        Row: {
+          id: string
+          item_id: string
+          location_id: string
+          acopio_center_id: string
+          stock: number
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          item_id: string
+          location_id: string
+          acopio_center_id: string
+          stock?: number
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          item_id?: string
+          location_id?: string
+          acopio_center_id?: string
+          stock?: number
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
           {
-            foreignKeyName: "inventory_items_location_id_fkey"
+            foreignKeyName: "inventory_item_stock_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_item_stock_location_id_fkey"
             columns: ["location_id"]
             isOneToOne: false
             referencedRelation: "inventory_locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_item_stock_acopio_center_id_fkey"
+            columns: ["acopio_center_id"]
+            isOneToOne: false
+            referencedRelation: "acopio_centers"
             referencedColumns: ["id"]
           },
         ]
@@ -923,6 +965,10 @@ export type UpdateInventoryLocation = TablesUpdate<"inventory_locations">
 export type InventoryItem = Tables<"inventory_items">
 export type InsertInventoryItem = TablesInsert<"inventory_items">
 export type UpdateInventoryItem = TablesUpdate<"inventory_items">
+
+export type InventoryItemStock = Tables<"inventory_item_stock">
+export type InsertInventoryItemStock = TablesInsert<"inventory_item_stock">
+export type UpdateInventoryItemStock = TablesUpdate<"inventory_item_stock">
 
 export type InventoryMovement = Tables<"inventory_movements">
 export type InsertInventoryMovement = TablesInsert<"inventory_movements">

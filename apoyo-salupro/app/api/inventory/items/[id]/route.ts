@@ -14,7 +14,8 @@ async function getCenterId(supabase: Awaited<ReturnType<typeof createClient>>) {
 
 /**
  * PATCH /api/inventory/items/[id]
- * Actualiza presentación o ubicación de un artículo.
+ * Actualiza la presentación de un artículo. La ubicación del stock se
+ * gestiona por movimiento (ver /api/inventory/movements), no aquí.
  */
 export async function PATCH(
   request: NextRequest,
@@ -25,14 +26,13 @@ export async function PATCH(
   const centerId = await getCenterId(supabase)
   if (!centerId) return Response.json({ data: null, error: 'Sin asignación de centro' }, { status: 403 })
 
-  let body: { presentacion?: string; location_id?: string | null }
+  let body: { presentacion?: string }
   try { body = await request.json() } catch {
     return Response.json({ data: null, error: 'JSON inválido' }, { status: 400 })
   }
 
-  const patch: { presentacion?: string; location_id?: string | null } = {}
+  const patch: { presentacion?: string } = {}
   if (body.presentacion !== undefined) patch.presentacion = body.presentacion.trim()
-  if (body.location_id !== undefined) patch.location_id = body.location_id
 
   if (Object.keys(patch).length === 0)
     return Response.json({ data: null, error: 'Sin campos para actualizar' }, { status: 400 })

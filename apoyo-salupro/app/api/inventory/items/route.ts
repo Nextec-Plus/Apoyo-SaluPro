@@ -14,7 +14,7 @@ async function getCenterId(supabase: Awaited<ReturnType<typeof createClient>>) {
 
 /**
  * GET /api/inventory/items
- * Lista los artículos del centro con sección, subcategoría, ubicación y stock.
+ * Lista los artículos del centro con sección, subcategoría, stock por ubicación y stock total.
  * Query params:
  *  - section_id    : filtra por sección
  *  - subcategory_id: filtra por subcategoría
@@ -37,8 +37,7 @@ export async function GET(request: NextRequest) {
       subcategory:inventory_subcategories(
         id, code, name, description, display_order,
         section:inventory_sections(id, code, name, display_order)
-      ),
-      location:inventory_locations(id, name)
+      )
     `)
     .eq('acopio_center_id', centerId)
     .order('created_at', { ascending: true })
@@ -49,26 +48,47 @@ export async function GET(request: NextRequest) {
   const { data, error } = await query
   if (error) return Response.json({ data: null, error: error.message }, { status: 500 })
 
+  const { data: stockRows, error: stockError } = await supabase
+    .from('inventory_item_stock')
+    .select('item_id, stock, location:inventory_locations(id, name)')
+    .eq('acopio_center_id', centerId)
+
+  if (stockError) return Response.json({ data: null, error: stockError.message }, { status: 500 })
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const stockByItem = new Map<string, any[]>()
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  for (const row of (stockRows ?? []) as any[]) {
+    const list = stockByItem.get(row.item_id) ?? []
+    list.push({ location_id: row.location?.id ?? null, location_name: row.location?.name ?? '—', stock: row.stock })
+    stockByItem.set(row.item_id, list)
+  }
+
+  const withStock = (data ?? []).map((it) => ({ ...it, stock_locations: stockByItem.get(it.id) ?? [] }))
+
   // Filtro de sección en memoria (Supabase no soporta filtro en relaciones anidadas con .eq)
   const filtered = sectionId
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    ? (data ?? []).filter((it: any) => it.subcategory?.section?.id === sectionId)
-    : data ?? []
+    ? withStock.filter((it: any) => it.subcategory?.section?.id === sectionId)
+    : withStock
 
   return Response.json({ data: filtered, error: null })
 }
 
 /**
  * POST /api/inventory/items
- * Registra un nuevo artículo en el centro.
- * Body: { subcategory_id, presentacion, location_id? }
+ * Registra un nuevo artículo en el centro. El stock se asigna a ubicaciones
+ * específicas mediante movimientos (ver /api/inventory/movements), por lo
+ * que el artículo nace sin ubicación fija y puede llegar a tener stock en
+ * varias a la vez.
+ * Body: { subcategory_id, presentacion }
  */
 export async function POST(request: NextRequest) {
   const supabase = await createClient()
   const centerId = await getCenterId(supabase)
   if (!centerId) return Response.json({ data: null, error: 'Sin asignación de centro' }, { status: 403 })
 
-  let body: { subcategory_id?: string; presentacion?: string; location_id?: string | null }
+  let body: { subcategory_id?: string; presentacion?: string }
   try { body = await request.json() } catch {
     return Response.json({ data: null, error: 'JSON inválido' }, { status: 400 })
   }
@@ -86,15 +106,13 @@ export async function POST(request: NextRequest) {
       acopio_center_id: centerId,
       subcategory_id: body.subcategory_id,
       presentacion,
-      location_id: body.location_id ?? null,
     })
     .select(`
       *,
       subcategory:inventory_subcategories(
         id, code, name,
         section:inventory_sections(id, code, name)
-      ),
-      location:inventory_locations(id, name)
+      )
     `)
     .single()
 
@@ -102,5 +120,5 @@ export async function POST(request: NextRequest) {
     const status = error.code === '23505' ? 409 : 500
     return Response.json({ data: null, error: error.message }, { status })
   }
-  return Response.json({ data, error: null }, { status: 201 })
+  return Response.json({ data: { ...data, stock_locations: [] }, error: null }, { status: 201 })
 }

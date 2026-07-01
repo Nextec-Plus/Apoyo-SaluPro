@@ -10,11 +10,17 @@ export type SectionWithSubcats = InventorySection & {
   subcategories: InventorySubcategory[]
 }
 
+export type ItemStockLocation = {
+  location_id: string
+  location_name: string
+  stock: number
+}
+
 export type ItemRow = InventoryItem & {
   subcategory: (InventorySubcategory & {
     section: InventorySection | null
   }) | null
-  location: Pick<InventoryLocation, 'id' | 'name'> | null
+  stock_locations: ItemStockLocation[]
 }
 
 export type MovementRow = InventoryMovement & {
@@ -23,4 +29,5 @@ export type MovementRow = InventoryMovement & {
       section: Pick<InventorySection, 'id' | 'name'> | null
     }) | null
   }) | null
+  location: Pick<InventoryLocation, 'id' | 'name'> | null
 }

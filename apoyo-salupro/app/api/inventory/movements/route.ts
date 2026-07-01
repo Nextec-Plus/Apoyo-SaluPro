@@ -34,7 +34,8 @@ export async function GET(request: NextRequest) {
       item:inventory_items(
         id, presentacion, stock,
         subcategory:inventory_subcategories(id, name, section:inventory_sections(id, name))
-      )
+      ),
+      location:inventory_locations(id, name)
     `)
     .eq('acopio_center_id', centerId)
     .order('created_at', { ascending: false })
@@ -50,8 +51,10 @@ export async function GET(request: NextRequest) {
 
 /**
  * POST /api/inventory/movements
- * Registra una entrada o salida. El trigger actualiza el stock atómicamente.
- * Body: { item_id, tipo, cantidad, location_id?, entregado_por?, destinatario?, medio_transporte?, nota? }
+ * Registra una entrada o salida en una ubicación específica. El trigger
+ * actualiza el stock de esa ubicación (y el total cacheado del artículo)
+ * atómicamente, por lo que un artículo puede tener stock en N ubicaciones.
+ * Body: { item_id, tipo, cantidad, location_id, entregado_por?, destinatario?, medio_transporte?, nota? }
  */
 export async function POST(request: NextRequest) {
   const supabase = await createClient()
@@ -76,6 +79,8 @@ export async function POST(request: NextRequest) {
     return Response.json({ data: null, error: 'item_id es requerido' }, { status: 400 })
   if (!body.tipo || !['entrada', 'salida'].includes(body.tipo))
     return Response.json({ data: null, error: 'tipo debe ser "entrada" o "salida"' }, { status: 400 })
+  if (!body.location_id)
+    return Response.json({ data: null, error: 'location_id es requerido' }, { status: 400 })
 
   const cantidad = Number(body.cantidad)
   if (!Number.isFinite(cantidad) || cantidad <= 0)
@@ -88,7 +93,7 @@ export async function POST(request: NextRequest) {
       item_id: body.item_id,
       tipo: body.tipo,
       cantidad,
-      location_id: body.location_id || null,
+      location_id: body.location_id,
       entregado_por: body.entregado_por?.trim() || null,
       destinatario: body.destinatario?.trim() || null,
       medio_transporte: body.medio_transporte?.trim() || null,

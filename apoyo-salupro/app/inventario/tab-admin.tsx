@@ -149,7 +149,6 @@ function ArticulosPanel({
   const [presentacion, setPresentacion] = useState("");
   const [stockInicial, setStockInicial] = useState("");
   const [creating, setCreating] = useState(false);
-  const [editingId, setEditingId] = useState<string | null>(null);
 
   const selectedSection = useMemo(
     () => sections.find((s) => s.id === sectionId) ?? null,
@@ -179,6 +178,8 @@ function ArticulosPanel({
     const stock0 = stockInicial === "" ? 0 : Number(stockInicial);
     if (!Number.isFinite(stock0) || stock0 < 0 || !Number.isInteger(stock0))
       return toast.error("Stock inicial debe ser un número entero ≥ 0.");
+    if (stock0 > 0 && !locationId)
+      return toast.error("Seleccione la ubicación del stock inicial.");
 
     setCreating(true);
     try {
@@ -188,7 +189,6 @@ function ArticulosPanel({
         body: JSON.stringify({
           subcategory_id: subcategoryId,
           presentacion: pres,
-          location_id: locationId || null,
         }),
       });
       const json = await res.json();
@@ -205,6 +205,7 @@ function ArticulosPanel({
             item_id: json.data.id,
             tipo: "entrada",
             cantidad: stock0,
+            location_id: locationId,
             nota: "Carga inicial",
           }),
         });
@@ -212,7 +213,7 @@ function ArticulosPanel({
         if (!mvRes.ok || mvJson.error) throw new Error(mvJson.error || "Artículo creado pero no se pudo registrar la carga inicial.");
         toast.success(`Artículo "${pres}" registrado con carga inicial de ${stock0} unidades`);
       } else {
-        toast.success(`Artículo "${pres}" registrado (stock 0)`);
+        toast.success(`Artículo "${pres}" registrado (stock 0). Puedes agregarle stock por ubicación desde Inventario → Entrada.`);
       }
 
       setPresentacion("");
@@ -311,7 +312,10 @@ function ArticulosPanel({
             )}
           </div>
           <div>
-            <label className={labelCls}>Ubicación</label>
+            <label className={labelCls}>
+              Ubicación del stock inicial{" "}
+              <span className="font-normal text-gray-400">(solo si hay stock inicial)</span>
+            </label>
             <Combobox
               items={locationItems}
               value={locationId}
@@ -346,7 +350,7 @@ function ArticulosPanel({
               <tr className="text-left text-[11px] uppercase tracking-wider text-gray-400 border-b border-border">
                 <th className="py-2 px-2 font-semibold">Subcategoría</th>
                 <th className="py-2 px-2 font-semibold">Presentación</th>
-                <th className="py-2 px-2 font-semibold">Ubicación</th>
+                <th className="py-2 px-2 font-semibold">Ubicaciones</th>
                 <th className="py-2 px-2 font-semibold text-right">Stock</th>
                 <th className="py-2 px-2 font-semibold text-right">Acciones</th>
               </tr>
@@ -358,40 +362,21 @@ function ArticulosPanel({
                     <span className="text-gray-400">{it.subcategory?.section?.name ?? ""} › </span>
                     {it.subcategory?.name ?? "—"}
                   </td>
-                  <td className="py-2 px-2 font-medium text-gray-800">
-                    {editingId === it.id ? (
-                      <EditLocationInline
-                        item={it}
-                        locations={locations}
-                        onCreateLocation={onCreateLocation}
-                        onSaved={async () => { setEditingId(null); await onChanged(); }}
-                        onCancel={() => setEditingId(null)}
-                      />
-                    ) : (
-                      it.presentacion
-                    )}
+                  <td className="py-2 px-2 font-medium text-gray-800">{it.presentacion}</td>
+                  <td className="py-2 px-2 text-xs text-gray-500">
+                    {it.stock_locations.length === 0
+                      ? "—"
+                      : it.stock_locations.map((l) => `${l.location_name}: ${l.stock}`).join(" · ")}
                   </td>
-                  <td className="py-2 px-2 text-xs text-gray-500">{it.location?.name ?? "—"}</td>
                   <td className="py-2 px-2 text-right tabular-nums font-semibold text-gray-800">{it.stock}</td>
                   <td className="py-2 px-2 text-right whitespace-nowrap">
-                    {editingId !== it.id && (
-                      <>
-                        <button
-                          type="button"
-                          onClick={() => setEditingId(it.id)}
-                          className="text-xs font-semibold text-primary hover:underline mr-3"
-                        >
-                          Ubicación
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => deleteItem(it)}
-                          className="text-xs font-semibold text-crisis hover:underline"
-                        >
-                          Eliminar
-                        </button>
-                      </>
-                    )}
+                    <button
+                      type="button"
+                      onClick={() => deleteItem(it)}
+                      className="text-xs font-semibold text-crisis hover:underline"
+                    >
+                      Eliminar
+                    </button>
                   </td>
                 </tr>
               ))}
@@ -399,69 +384,6 @@ function ArticulosPanel({
           </table>
         </div>
       )}
-    </div>
-  );
-}
-
-function EditLocationInline({
-  item,
-  locations,
-  onCreateLocation,
-  onSaved,
-  onCancel,
-}: {
-  item: ItemRow;
-  locations: InventoryLocation[];
-  onCreateLocation: (name: string) => Promise<string | null>;
-  onSaved: () => Promise<void>;
-  onCancel: () => void;
-}) {
-  const toast = useToast();
-  const [locationId, setLocationId] = useState(item.location_id ?? "");
-  const [saving, setSaving] = useState(false);
-
-  const locationItems = locations.map((l) => ({ id: l.id, label: l.name }));
-  locationItems.unshift({ id: "", label: "Sin ubicación" });
-
-  const save = async () => {
-    setSaving(true);
-    try {
-      const res = await fetch(`/api/inventory/items/${item.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ location_id: locationId || null }),
-      });
-      const json = await res.json();
-      if (!res.ok || json.error) throw new Error(json.error || "No se pudo actualizar");
-      toast.success("Ubicación actualizada");
-      await onSaved();
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Error inesperado");
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <div className="flex items-center gap-2">
-      <span className="text-gray-800 shrink-0">{item.presentacion}</span>
-      <div className="min-w-[200px]">
-        <Combobox
-          items={locationItems}
-          value={locationId}
-          onChange={setLocationId}
-          placeholder="Ubicación..."
-          emptyText="Sin ubicaciones"
-          createLabel="Crear nueva ubicación"
-          createPlaceholder="Nombre de la ubicación"
-          onCreate={onCreateLocation}
-        />
-      </div>
-      <button type="button" onClick={save} disabled={saving}
-        className="text-xs font-bold text-primary hover:underline disabled:opacity-60 shrink-0">
-        {saving ? "…" : "OK"}
-      </button>
-      <button type="button" onClick={onCancel} className="text-xs text-gray-400 hover:text-gray-700 shrink-0">✕</button>
     </div>
   );
 }
