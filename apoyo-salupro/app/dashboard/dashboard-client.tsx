@@ -10,10 +10,12 @@ import { TabDesaparecidos } from "./tabs/tab-desaparecidos";
 import { TabEncontrados }  from "./tabs/tab-encontrados";
 import { TabTriaje }       from "./tabs/tab-triaje";
 import { TabPacientes }    from "./tabs/tab-pacientes";
+import { TabAyudas }       from "./tabs/tab-ayudas";
 import { TabReportes }     from "./tabs/tab-reportes";
 import { PatientModal }    from "./patient-modal";
+import { NavScroller }     from "@/components/ui/nav-scroller";
 
-type Tab = "ficha" | "pacientes" | "desaparecidos" | "encontrados" | "triaje" | "reportes";
+type Tab = "ficha" | "pacientes" | "desaparecidos" | "encontrados" | "triaje" | "ayudas" | "reportes";
 
 const TABS: { id: Tab; label: string; icon: string }[] = [
   { id: "ficha",         label: "Ficha Médica",           icon: "📋" },
@@ -21,6 +23,7 @@ const TABS: { id: Tab; label: string; icon: string }[] = [
   { id: "desaparecidos", label: "Personas Desaparecidas", icon: "🔍" },
   { id: "encontrados",   label: "Encontrados",            icon: "✅" },
   { id: "triaje",        label: "Triaje",                 icon: "🏥" },
+  { id: "ayudas",        label: "Ayudas",                 icon: "📦" },
   { id: "reportes",      label: "Reportes",               icon: "📊" },
 ];
 
@@ -30,7 +33,7 @@ export function DashboardClient() {
   const initialTab = searchParams.get("tab");
   const pacienteParam = searchParams.get("paciente");
   const [activeTab, setActiveTab] = useState<Tab>(
-    initialTab === "pacientes" || initialTab === "desaparecidos" || initialTab === "encontrados" || initialTab === "triaje" || initialTab === "reportes"
+    initialTab === "pacientes" || initialTab === "desaparecidos" || initialTab === "encontrados" || initialTab === "triaje" || initialTab === "ayudas" || initialTab === "reportes"
       ? initialTab
       : "ficha",
   );
@@ -146,22 +149,24 @@ export function DashboardClient() {
 
       {/* ── Tab nav ───────────────────────────────────────────────────── */}
       <nav className="bg-white border-b border-border sticky top-0 z-50 shadow-sm">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 flex">
-          {TABS.map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={[
-                "flex items-center gap-1.5 px-4 sm:px-6 py-3.5 text-sm font-medium border-b-2 transition-colors",
-                activeTab === tab.id
-                  ? "border-primary text-primary"
-                  : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300",
-              ].join(" ")}
-            >
-              <span className="text-base">{tab.icon}</span>
-              <span className="hidden sm:inline">{tab.label}</span>
-            </button>
-          ))}
+        <div className="max-w-5xl mx-auto px-4 sm:px-6">
+          <NavScroller>
+            {TABS.map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={[
+                  "flex items-center gap-1.5 shrink-0 whitespace-nowrap px-3.5 sm:px-6 py-3.5 text-sm font-medium border-b-2 transition-colors",
+                  activeTab === tab.id
+                    ? "border-primary text-primary"
+                    : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300",
+                ].join(" ")}
+              >
+                <span className="text-base">{tab.icon}</span>
+                <span className="hidden sm:inline">{tab.label}</span>
+              </button>
+            ))}
+          </NavScroller>
         </div>
       </nav>
 
@@ -186,6 +191,7 @@ export function DashboardClient() {
           <TabEncontrados onOpenPatient={openPatient} />
         )}
         {activeTab === "triaje"        && <TabTriaje />}
+        {activeTab === "ayudas"        && <TabAyudas />}
         {activeTab === "reportes"      && <TabReportes />}
       </main>
 

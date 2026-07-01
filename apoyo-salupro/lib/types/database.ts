@@ -739,6 +739,93 @@ export type Database = {
         }
         Relationships: []
       }
+      ayuda_tipos: {
+        Row: {
+          id: string
+          organization_id: string
+          nombre: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          organization_id: string
+          nombre: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          organization_id?: string
+          nombre?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      ayuda_entregas: {
+        Row: {
+          id: string
+          organization_id: string
+          cedula: string
+          nombre_completo: string
+          created_by: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          organization_id: string
+          cedula: string
+          nombre_completo: string
+          created_by?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          organization_id?: string
+          cedula?: string
+          nombre_completo?: string
+          created_by?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
+      ayuda_entrega_items: {
+        Row: {
+          id: string
+          entrega_id: string
+          tipo_id: string
+          cantidad: number
+        }
+        Insert: {
+          id?: string
+          entrega_id: string
+          tipo_id: string
+          cantidad: number
+        }
+        Update: {
+          id?: string
+          entrega_id?: string
+          tipo_id?: string
+          cantidad?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ayuda_entrega_items_entrega_id_fkey"
+            columns: ["entrega_id"]
+            isOneToOne: false
+            referencedRelation: "ayuda_entregas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ayuda_entrega_items_tipo_id_fkey"
+            columns: ["tipo_id"]
+            isOneToOne: false
+            referencedRelation: "ayuda_tipos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -755,6 +842,17 @@ export type Database = {
           p_nota?: string | null
         }
         Returns: void
+      }
+      create_ayuda_entrega: {
+        Args: {
+          p_organization_id: string
+          p_cedula: string
+          p_nombre_completo: string
+          p_tipo_ids: string[]
+          p_cantidades: number[]
+          p_user?: string | null
+        }
+        Returns: string
       }
     }
     Enums: {
@@ -950,6 +1048,13 @@ export type UpdateCatastropheFamilyContact = TablesUpdate<"catastrophe_family_co
 export type CatastropheCareRequirement = Tables<"catastrophe_care_requirements">
 export type InsertCatastropheCareRequirement = TablesInsert<"catastrophe_care_requirements">
 export type UpdateCatastropheCareRequirement = TablesUpdate<"catastrophe_care_requirements">
+
+// ── Ayudas (Control de Crisis) ───────────────────────────────────────────────
+export type AyudaTipoCatalogo = Tables<"ayuda_tipos">
+export type InsertAyudaTipoCatalogo = TablesInsert<"ayuda_tipos">
+export type AyudaEntrega = Tables<"ayuda_entregas">
+export type InsertAyudaEntrega = TablesInsert<"ayuda_entregas">
+export type AyudaEntregaItem = Tables<"ayuda_entrega_items">
 
 export type MissingPersonStatus = Database["public"]["Enums"]["missing_person_status"]
 export type MissingPersonMatchType = Database["public"]["Enums"]["missing_person_match_type"]

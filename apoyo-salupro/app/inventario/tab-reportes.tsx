@@ -120,7 +120,7 @@ export function TabReportes() {
             )}
           </button>
           {/* Período */}
-          <div className="flex gap-1 bg-muted rounded-lg p-1 overflow-x-auto max-w-full">
+          <div className="flex gap-1 bg-muted rounded-lg p-1 overflow-x-auto no-scrollbar max-w-full">
             {PRESETS.map((p) => (
               <button
                 key={p.id}

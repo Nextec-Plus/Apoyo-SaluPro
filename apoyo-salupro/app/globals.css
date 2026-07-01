@@ -93,6 +93,14 @@ h2 {
 ::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 9999px; }
 ::-webkit-scrollbar-thumb:hover { background: #9ca3af; }
 
+/* Barras de tabs con scroll horizontal: sin scrollbar visible (el gesto de
+   swipe/drag sigue funcionando, solo se oculta el track/thumb). */
+.no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.no-scrollbar::-webkit-scrollbar { display: none; }
+
 /* ── Impresión / Exportar PDF (Reportes) ─────────────────────────────────── */
 @media print {
   /* Ocultar chrome del sitio: cabeceras fijas, navegación, pie y controles */

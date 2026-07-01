@@ -130,7 +130,7 @@ export function TabInventario() {
             Stock por artículo · Entradas y salidas · Kardex
           </p>
         </div>
-        <div className="flex gap-1 bg-muted rounded-lg p-1 overflow-x-auto -mx-1 px-1 sm:mx-0 sm:px-1">
+        <div className="flex gap-1 bg-muted rounded-lg p-1 overflow-x-auto no-scrollbar -mx-1 px-1 sm:mx-0 sm:px-1">
           {subViewOpts.map((opt) => (
             <button
               key={opt.v}
