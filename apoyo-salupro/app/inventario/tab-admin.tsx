@@ -97,7 +97,7 @@ export function TabAdmin() {
   }, [loadLocations, toast]);
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-border p-6">
+    <div className="bg-white rounded-xl shadow-sm border border-border p-4 sm:p-6">
       <div className="border-b border-border pb-3 mb-6 flex flex-wrap items-end justify-between gap-3">
         <div>
           <h2 className="text-lg font-bold text-gray-800">Administración</h2>

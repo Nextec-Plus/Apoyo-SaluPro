@@ -228,7 +228,7 @@ export function TabSolicitudes() {
     <div className="space-y-6">
       {/* ── Header + stats ─────────────────────────────────────── */}
       <div>
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
           <div>
             <h2 className="font-display text-xl font-bold text-gray-900">Solicitudes de insumos</h2>
             <p className="text-xs text-gray-500 mt-0.5">

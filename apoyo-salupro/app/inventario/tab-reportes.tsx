@@ -85,7 +85,7 @@ export function TabReportes() {
   const puntos = data?.solicitudes.geo ?? [];
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-border p-6">
+    <div className="bg-white rounded-xl shadow-sm border border-border p-4 sm:p-6">
       {/* ── Cabecera ───────────────────────────────────────────────────── */}
       <div className="border-b border-border pb-3 mb-6 flex flex-wrap items-end justify-between gap-3">
         <div>
@@ -94,7 +94,7 @@ export function TabReportes() {
             Estadísticas y métricas para stakeholders
           </p>
         </div>
-        <div className="flex items-center gap-2 no-print">
+        <div className="flex flex-wrap items-center gap-2 no-print">
           {/* Exportar PDF */}
           <button
             type="button"
@@ -120,13 +120,13 @@ export function TabReportes() {
             )}
           </button>
           {/* Período */}
-          <div className="flex gap-1 bg-muted rounded-lg p-1">
+          <div className="flex gap-1 bg-muted rounded-lg p-1 overflow-x-auto max-w-full">
             {PRESETS.map((p) => (
               <button
                 key={p.id}
                 type="button"
                 onClick={() => setPreset(p.id)}
-                className={`text-xs font-semibold px-3 py-1.5 rounded-md transition-colors ${
+                className={`shrink-0 whitespace-nowrap text-xs font-semibold px-3 py-1.5 rounded-md transition-colors ${
                   preset === p.id ? "bg-white text-primary shadow-sm" : "text-gray-500 hover:text-gray-800"
                 }`}
               >

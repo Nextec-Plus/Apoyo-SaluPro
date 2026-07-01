@@ -122,21 +122,21 @@ export function TabInventario() {
   ];
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-border p-6">
-      <div className="border-b border-border pb-3 mb-6 flex flex-wrap items-end justify-between gap-3">
+    <div className="bg-white rounded-xl shadow-sm border border-border p-4 sm:p-6">
+      <div className="border-b border-border pb-3 mb-6 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
         <div>
           <h2 className="text-lg font-bold text-gray-800">Inventario</h2>
           <p className="text-xs text-gray-500 mt-0.5">
             Stock por artículo · Entradas y salidas · Kardex
           </p>
         </div>
-        <div className="flex gap-1 bg-muted rounded-lg p-1">
+        <div className="flex gap-1 bg-muted rounded-lg p-1 overflow-x-auto -mx-1 px-1 sm:mx-0 sm:px-1">
           {subViewOpts.map((opt) => (
             <button
               key={opt.v}
               type="button"
               onClick={() => setSubView(opt.v)}
-              className={`text-sm font-semibold px-3.5 py-1.5 rounded-md transition-colors ${
+              className={`shrink-0 whitespace-nowrap text-sm font-semibold px-3.5 py-1.5 rounded-md transition-colors ${
                 subView === opt.v ? "bg-white text-primary shadow-sm" : "text-gray-500 hover:text-gray-800"
               }`}
             >
@@ -540,7 +540,7 @@ function MovimientoForm({
 
       {showQuickCreate && subcategoryId && (
         <div className="bg-primary/5 border border-primary/20 rounded-lg p-3 space-y-3 animate-in fade-in">
-          <div className="flex items-end gap-3">
+          <div className="flex flex-col sm:flex-row sm:items-end gap-3">
             <div className="flex-1">
               <label className="block text-[11px] font-semibold text-gray-700 mb-1">Nombre del artículo</label>
               <input
@@ -552,7 +552,7 @@ function MovimientoForm({
                 onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); quickCreate(); } }}
               />
             </div>
-            <div className="w-28">
+            <div className="w-full sm:w-28">
               <label className="block text-[11px] font-semibold text-gray-700 mb-1">Cant. inicial</label>
               <input
                 type="number"
@@ -564,21 +564,23 @@ function MovimientoForm({
                 onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); quickCreate(); } }}
               />
             </div>
-            <button
-              type="button"
-              onClick={quickCreate}
-              disabled={quickCreating}
-              className="bg-primary hover:bg-primary/90 text-white font-bold text-xs px-4 py-2.5 rounded-lg disabled:opacity-60 whitespace-nowrap"
-            >
-              {quickCreating ? "Creando…" : "Crear"}
-            </button>
-            <button
-              type="button"
-              onClick={() => { setShowQuickCreate(false); setQuickNombre(""); setQuickCantidad(""); }}
-              className="text-xs text-gray-400 hover:text-gray-600"
-            >
-              Cancelar
-            </button>
+            <div className="flex items-center gap-3 sm:contents">
+              <button
+                type="button"
+                onClick={quickCreate}
+                disabled={quickCreating}
+                className="flex-1 sm:flex-initial bg-primary hover:bg-primary/90 text-white font-bold text-xs px-4 py-2.5 rounded-lg disabled:opacity-60 whitespace-nowrap"
+              >
+                {quickCreating ? "Creando…" : "Crear"}
+              </button>
+              <button
+                type="button"
+                onClick={() => { setShowQuickCreate(false); setQuickNombre(""); setQuickCantidad(""); }}
+                className="text-xs text-gray-400 hover:text-gray-600 whitespace-nowrap"
+              >
+                Cancelar
+              </button>
+            </div>
           </div>
           <div>
             <label className="block text-[11px] font-semibold text-gray-700 mb-1">Ubicación</label>
@@ -940,8 +942,8 @@ function TrasladoForm({
           </p>
         )}
 
-        <div className="flex items-end gap-3">
-          <div className="w-32">
+        <div className="flex flex-col sm:flex-row sm:items-end gap-3">
+          <div className="w-full sm:w-32">
             <label className={labelCls}>
               Cantidad {selected && <span className="font-normal text-gray-400">(máx: {stockDisponible})</span>}
             </label>
@@ -960,7 +962,7 @@ function TrasladoForm({
             type="button"
             onClick={addLinea}
             disabled={!itemId || !cantidad}
-            className="bg-primary hover:bg-primary/90 text-white font-bold text-xs px-4 py-2.5 rounded-lg disabled:opacity-60 whitespace-nowrap"
+            className="w-full sm:w-auto bg-primary hover:bg-primary/90 text-white font-bold text-xs px-4 py-2.5 rounded-lg disabled:opacity-60 whitespace-nowrap"
           >
             + Agregar a la lista
           </button>
@@ -1066,8 +1068,8 @@ function Kardex({ items, loadingItems }: { items: ItemRow[]; loadingItems: boole
       </div>
 
       {selected && (
-        <div className="flex items-center gap-4 bg-muted border border-border rounded-lg px-4 py-3">
-          <div className="flex-1 min-w-0">
+        <div className="flex flex-wrap items-center gap-4 bg-muted border border-border rounded-lg px-4 py-3">
+          <div className="flex-1 min-w-[160px]">
             <p className="text-xs text-gray-400">Artículo</p>
             <p className="font-semibold text-gray-800 truncate">{selected.presentacion}</p>
             <p className="text-[11px] text-gray-400 truncate">
