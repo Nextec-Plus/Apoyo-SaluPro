@@ -4,16 +4,19 @@ import { useEffect, useState } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { DevCredit } from "@/components/dev-credit";
 import { TabInventario } from "./tab-inventario";
 import { TabAdmin } from "./tab-admin";
 import { TabSolicitudes } from "./tab-solicitudes";
+import { TabReportes } from "./tab-reportes";
 
-type Tab = "inventario" | "admin" | "solicitudes";
+type Tab = "inventario" | "admin" | "solicitudes" | "reportes";
 
 const TABS: { id: Tab; label: string; icon: string }[] = [
   { id: "inventario", label: "Inventario", icon: "📦" },
   { id: "admin", label: "Administración", icon: "⚙️" },
   { id: "solicitudes", label: "Solicitudes", icon: "📋" },
+  { id: "reportes", label: "Reportes", icon: "📊" },
 ];
 
 export function InventarioClient() {
@@ -103,10 +106,12 @@ export function InventarioClient() {
         {activeTab === "inventario" && <TabInventario />}
         {activeTab === "admin" && <TabAdmin />}
         {activeTab === "solicitudes" && <TabSolicitudes />}
+        {activeTab === "reportes" && <TabReportes />}
       </main>
 
       <footer className="bg-gray-800 text-gray-400 text-center py-3 text-xs border-t border-gray-700">
         <p>Sistema Descentralizado · Apoyo SaluPro · Centro de Acopio · Venezuela 2026</p>
+        <DevCredit />
       </footer>
     </div>
   );
