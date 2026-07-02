@@ -40,6 +40,66 @@ function AyudasBadges({ items }: { items: ItemWithTipo[] }) {
 
 type SubView = "registrar" | "entregadas";
 
+function pageRange(page: number, totalPages: number): (number | "…")[] {
+  const pages = new Set<number>([1, totalPages, page, page - 1, page + 1]);
+  const sorted = [...pages].filter((p) => p >= 1 && p <= totalPages).sort((a, b) => a - b);
+  const withGaps: (number | "…")[] = [];
+  let prev = 0;
+  for (const p of sorted) {
+    if (prev && p - prev > 1) withGaps.push("…");
+    withGaps.push(p);
+    prev = p;
+  }
+  return withGaps;
+}
+
+function PageNumbers({
+  page,
+  totalPages,
+  onChange,
+}: {
+  page: number;
+  totalPages: number;
+  onChange: (page: number) => void;
+}) {
+  return (
+    <div className="flex items-center gap-1">
+      <button
+        type="button"
+        onClick={() => onChange(page - 1)}
+        disabled={page <= 1}
+        className="text-xs font-semibold text-gray-500 rounded-md px-2 py-1 hover:bg-muted disabled:opacity-40 disabled:hover:bg-transparent"
+      >
+        ‹
+      </button>
+      {pageRange(page, totalPages).map((p, i) =>
+        p === "…" ? (
+          <span key={`gap-${i}`} className="text-xs text-gray-300 px-1">…</span>
+        ) : (
+          <button
+            key={p}
+            type="button"
+            onClick={() => onChange(p)}
+            className={`text-xs font-semibold rounded-md px-2.5 py-1 ${
+              p === page ? "bg-primary text-white" : "text-gray-500 hover:bg-muted"
+            }`}
+          >
+            {p}
+          </button>
+        ),
+      )}
+      <button
+        type="button"
+        onClick={() => onChange(page + 1)}
+        disabled={page >= totalPages}
+        className="text-xs font-semibold text-gray-500 rounded-md px-2 py-1 hover:bg-muted disabled:opacity-40 disabled:hover:bg-transparent"
+      >
+        ›
+      </button>
+    </div>
+  );
+}
+
 export function TabAyudas() {
   const toast = useToast();
   const [subView, setSubView] = useState<SubView>("registrar");
@@ -81,6 +141,7 @@ export function TabAyudas() {
   const [savingTipo, setSavingTipo] = useState(false);
   const [editingTipoId, setEditingTipoId] = useState<string | null>(null);
   const [editTipoNombre, setEditTipoNombre] = useState("");
+  const [catalogoSearch, setCatalogoSearch] = useState("");
 
   const crearTipo = async () => {
     const nombreTipo = nuevoTipoNombre.trim();
@@ -175,12 +236,19 @@ export function TabAyudas() {
   const [searchCedula, setSearchCedula] = useState("");
   const [searchNombre, setSearchNombre] = useState("");
   const [filterTipoId, setFilterTipoId] = useState("");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(12);
+  const [total, setTotal] = useState(0);
 
-  const loadRows = useCallback(async (filtros?: { cedula?: string; nombre?: string; tipoId?: string }) => {
+  const loadRows = useCallback(async (filtros?: { cedula?: string; nombre?: string; tipoId?: string; page?: number; pageSize?: number }) => {
     setLoadingRows(true);
     try {
       const organization_id = getClientOrganizationId();
-      const params = new URLSearchParams({ organization_id, limit: "50" });
+      const params = new URLSearchParams({
+        organization_id,
+        page: String(filtros?.page ?? 1),
+        page_size: String(filtros?.pageSize ?? 12),
+      });
       if (filtros?.cedula) params.set("cedula", filtros.cedula);
       if (filtros?.nombre) params.set("nombre", filtros.nombre);
       if (filtros?.tipoId) params.set("tipo_id", filtros.tipoId);
@@ -188,6 +256,7 @@ export function TabAyudas() {
       const json = await res.json();
       if (json.error) throw new Error(json.error);
       setRows(json.data ?? []);
+      setTotal(json.total ?? 0);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "No se pudieron cargar los registros");
     } finally {
@@ -195,20 +264,32 @@ export function TabAyudas() {
     }
   }, [toast]);
 
-  useEffect(() => { loadRows(); }, [loadRows]);
+  useEffect(() => {
+    loadRows({ cedula: searchCedula || undefined, nombre: searchNombre || undefined, tipoId: filterTipoId || undefined, page, pageSize });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page]);
 
   useEffect(() => {
+    setPage(1);
     const t = setTimeout(
-      () => loadRows({ cedula: searchCedula || undefined, nombre: searchNombre || undefined, tipoId: filterTipoId || undefined }),
+      () => loadRows({ cedula: searchCedula || undefined, nombre: searchNombre || undefined, tipoId: filterTipoId || undefined, page: 1, pageSize }),
       350,
     );
     return () => clearTimeout(t);
-  }, [searchCedula, searchNombre, filterTipoId, loadRows]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchCedula, searchNombre, filterTipoId, pageSize]);
 
   const seleccionadas = useMemo(
     () => tipos.filter((t) => t.id in cantidades),
     [tipos, cantidades],
   );
+
+  const catalogoScrollable = tipos.length > 12;
+  const filteredTipos = useMemo(() => {
+    if (!catalogoScrollable || !catalogoSearch.trim()) return tipos;
+    const q = catalogoSearch.trim().toLowerCase();
+    return tipos.filter((t) => t.nombre.toLowerCase().includes(q));
+  }, [tipos, catalogoScrollable, catalogoSearch]);
 
   const puedeGuardar =
     cedula.length > 0 &&
@@ -244,7 +325,8 @@ export function TabAyudas() {
       setNombre("");
       setCantidades({});
       setHistorial([]);
-      loadRows({ cedula: searchCedula || undefined, nombre: searchNombre || undefined, tipoId: filterTipoId || undefined });
+      setPage(1);
+      loadRows({ cedula: searchCedula || undefined, nombre: searchNombre || undefined, tipoId: filterTipoId || undefined, page: 1, pageSize });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Error inesperado");
     } finally {
@@ -283,7 +365,7 @@ export function TabAyudas() {
       </div>
 
       {subView === "registrar" && (
-        <form onSubmit={handleSubmit} className="space-y-5 max-w-2xl">
+        <form onSubmit={handleSubmit} className="space-y-5 max-w-4xl">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className={labelCls}>Cédula</label>
@@ -330,8 +412,18 @@ export function TabAyudas() {
             {loadingTipos ? (
               <p className="text-xs text-gray-400 py-2">Cargando catálogo…</p>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {tipos.map((tipo) => {
+              <>
+                {catalogoScrollable && (
+                  <input
+                    value={catalogoSearch}
+                    onChange={(e) => setCatalogoSearch(e.target.value)}
+                    placeholder="Buscar ayuda…"
+                    className={`${inputCls} mb-3`}
+                  />
+                )}
+                <div className={catalogoScrollable ? "max-h-[420px] overflow-y-auto pr-1" : ""}>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {filteredTipos.map((tipo) => {
                   const activa = tipo.id in cantidades;
                   const editando = editingTipoId === tipo.id;
                   return (
@@ -430,12 +522,14 @@ export function TabAyudas() {
                   <button
                     type="button"
                     onClick={() => setAddingTipo(true)}
-                    className="rounded-lg border-2 border-dashed border-border hover:border-primary/40 p-3 text-sm font-semibold text-gray-400 hover:text-primary transition-colors text-center"
+                    className="min-h-[46px] flex items-center justify-center rounded-lg border-2 border-dashed border-border hover:border-primary/40 p-3 text-sm font-semibold text-gray-400 hover:text-primary transition-colors text-center"
                   >
                     + Otro
                   </button>
                 )}
-              </div>
+                  </div>
+                </div>
+              </>
             )}
           </div>
 
@@ -452,9 +546,14 @@ export function TabAyudas() {
       {subView === "entregadas" && (
         <div>
           <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
-            <h3 className="text-[11px] font-bold uppercase tracking-widest text-gray-400">
-              Ayudas entregadas
-            </h3>
+            <div className="flex items-baseline gap-2">
+              <h3 className="text-[11px] font-bold uppercase tracking-widest text-gray-400">
+                Ayudas entregadas
+              </h3>
+              <span className="text-xs text-gray-400">
+                · {total.toLocaleString("es-VE")} persona{total === 1 ? "" : "s"} ayudada{total === 1 ? "" : "s"}
+              </span>
+            </div>
             <div className="flex flex-wrap gap-2 w-full sm:w-auto">
               <input
                 value={searchNombre}
@@ -516,6 +615,29 @@ export function TabAyudas() {
                   ))}
                 </tbody>
               </table>
+            </div>
+          )}
+
+          {!loadingRows && total > 0 && (
+            <div className="flex flex-wrap items-center justify-between gap-3 mt-4 pt-3 border-t border-border">
+              <label className="flex items-center gap-2 text-xs text-gray-500">
+                Filas por página
+                <select
+                  value={pageSize}
+                  onChange={(e) => setPageSize(Number(e.target.value))}
+                  className="text-xs bg-white border border-border rounded-md px-2 py-1 text-gray-700 focus:outline-none focus:ring-2 focus:ring-primary-ring focus:border-primary"
+                >
+                  {[12, 25, 50, 100, 500].map((n) => (
+                    <option key={n} value={n}>{n}</option>
+                  ))}
+                </select>
+              </label>
+
+              <PageNumbers
+                page={page}
+                totalPages={Math.max(1, Math.ceil(total / pageSize))}
+                onChange={setPage}
+              />
             </div>
           )}
         </div>
