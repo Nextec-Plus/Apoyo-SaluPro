@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { ReporteImpacto } from "./reporte-impacto";
 import { ReporteControl } from "./reporte-control";
 import { MapaCalorDynamic } from "./mapa-calor-dynamic";
-import { SaluproLoader } from "./salupro-loader";
+import { SaluproLoader } from "@/components/ui/salupro-loader";
 import type { ReportData } from "./reportes-types";
 
 type ReportView = "impacto" | "control" | "mapa";

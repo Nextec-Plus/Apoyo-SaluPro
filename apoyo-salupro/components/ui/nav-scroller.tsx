@@ -1,11 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { Children, cloneElement, isValidElement, useCallback, useEffect, useRef, useState } from "react";
+import type { ReactElement } from "react";
 
 /**
  * Fila de tabs con scroll horizontal sin scrollbar nativa. Muestra flechas
  * y un fade en los bordes solo cuando hay contenido oculto, para que nunca
- * se sienta "cortado" sin ninguna pista de que hay más tabs.
+ * se sienta "cortado" sin ninguna pista de que hay más tabs. scroll-snap
+ * asegura que en reposo siempre se vea una tab completa, nunca una palabra
+ * cortada a la mitad.
  */
 export function NavScroller({ children, className = "" }: { children: React.ReactNode; className?: string }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -33,17 +36,25 @@ export function NavScroller({ children, className = "" }: { children: React.Reac
     ref.current?.scrollBy({ left: dir * ref.current.clientWidth * 0.6, behavior: "smooth" });
   };
 
+  const snappedChildren = Children.map(children, (child) => {
+    if (!isValidElement(child)) return child;
+    const el = child as ReactElement<{ className?: string }>;
+    return cloneElement(el, {
+      className: `${el.props.className ?? ""} snap-start`.trim(),
+    });
+  });
+
   return (
     <div className={`relative ${className}`}>
       <div
         ref={ref}
-        className="flex overflow-x-auto no-scrollbar"
+        className="flex overflow-x-auto no-scrollbar snap-x snap-mandatory"
         style={{
           maskImage: `linear-gradient(to right, ${canLeft ? "transparent" : "black"} 0, black 24px, black calc(100% - 24px), ${canRight ? "transparent" : "black"} 100%)`,
           WebkitMaskImage: `linear-gradient(to right, ${canLeft ? "transparent" : "black"} 0, black 24px, black calc(100% - 24px), ${canRight ? "transparent" : "black"} 100%)`,
         }}
       >
-        {children}
+        {snappedChildren}
       </div>
       {canLeft && (
         <button
